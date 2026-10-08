@@ -59,6 +59,7 @@ index=head('Tully Njoroge','Tully Njoroge: MBA in Finance and Entrepreneurship, 
       <div><dt>Certification</dt><dd>CFA Level I candidate</dd></div>
       <div><dt>Looking at</dt><dd>Management consulting · Data analytics · Venture capital</dd></div>
     </dl>
+    <div class="btns rv" style="margin-top:22px"><a class="btn" href="extracurriculars.html">Extracurriculars <span class="arr">→</span></a></div>
   </div>
 </div></section>
 </main>
@@ -268,3 +269,59 @@ h1b=head('H-1B Employer Research','Employer and labor-market analysis for an exp
 '''+contact()
 open(os.path.join(OUT,'h1b-employer-research.html'),'w').write(h1b)
 print('all pages ok')
+
+# ---------------- Extracurriculars ----------------
+extra=head('Extracurriculars','Tully Njoroge outside the classroom: NCAA Division II varsity swimming and team captain at Rollins College, Crummer Finance Organization and the MBA Association.')+nav('extra')+"""
+<main>
+<section class="cs-hero"><div class="wrap">
+  <a class="crumb" href="index.html#about">← Home</a>
+  <div style="margin-top:28px"><span class="code data">Leadership · Athletics</span></div>
+  <h1 class="display split" style="font-size:clamp(22px,6vw,104px)">Extracurriculars</h1>
+  <p class="lede rv">Most of what I know about leading people I learned in a pool at six in the morning. The rest came from running student organizations, where nobody is required to show up and you have to give them a reason to.</p>
+</div></section>
+
+<div class="wrap">
+<section class="block"><header><span class="code aero">Athletics</span><h2 class="display">Varsity swimming</h2><p class="eyebrow">Rollins College · NCAA Division II · 2020–2025</p></header><div class="prose" style="max-width:none">
+  <div class="pool rv"><canvas data-pool aria-hidden="true"></canvas><span class="pool-label">Lane 4 · TN</span></div>
+  <div class="factbar rv" data-count-wrap style="margin-top:0">
+    <div><b data-count="5">5</b><span>Seasons on the Rollins varsity team, 2020–2025</span></div>
+    <div><b data-count="2">2</b><span>Seasons as team captain, 2022–23 and 2023–24</span></div>
+    <div><b data-count="40" data-suf="+">40+</b><span>Teammates led as captain</span></div>
+    <div><b data-count="24" data-pre="~" data-suf=" hrs">~24 hrs</b><span>Of training a week, alongside a full course load</span></div>
+  </div>
+  <div class="prose" style="margin-top:8px">
+    <p class="rv">I swam five seasons for Rollins in NCAA Division II while finishing a psychology and sociology degree and starting the MBA. Balancing roughly 24 hours a week of training with a full academic load taught me more about time management than any planner ever has.</p>
+    <p class="rv"><strong>Team captain, 2022–23 and 2023–24.</strong> As captain I was the link between more than 40 teammates and the coaching staff: setting the tone at practice, keeping morale up through a long season, and making sure quieter teammates were heard. It is where I learned that leading is mostly listening, then doing the unglamorous work first.</p>
+    <p class="rv"><strong>Most Improved Athlete.</strong> Recognized by the team for progress over a season, which I'll take as proof that showing up consistently beats natural talent, at least eventually.</p>
+  </div>
+</div></section>
+
+<section class="block" style="border-bottom:0"><header><span class="code fin">Leadership</span><h2 class="display">Crummer leadership</h2><p class="eyebrow">Crummer Graduate School of Business</p></header><div class="prose" style="max-width:none">
+  <div class="roles">
+    <article class="role rv">
+      <div class="role-top"><span class="eyebrow">Aug 2025 – May 2026</span><span class="code fin">Finance</span></div>
+      <h3 class="display">Vice President</h3>
+      <div class="org">Crummer Finance Organization</div>
+      <ul class="clean">
+        <li>Partnered with the President on annual strategic planning, setting the organization's priorities and its calendar of events.</li>
+        <li>Served as the link between student services, the faculty advisor and members, so initiatives lined up with what students actually needed.</li>
+        <li>Coordinated professional-development events and industry networking opportunities for members.</li>
+      </ul>
+    </article>
+    <article class="role rv d1">
+      <div class="role-top"><span class="eyebrow">MBA Association</span><span class="code aero">Community</span></div>
+      <h3 class="display">International Student Representative</h3>
+      <div class="org">MBA Association, Crummer Graduate School of Business</div>
+      <ul class="clean">
+        <li>Represented the international students in my MBA class within the MBA Association.</li>
+        <li>Served as their point of contact, taking questions and concerns to the association and the school.</li>
+        <li>Having moved from Johannesburg myself, I knew the experience from both sides.</li>
+      </ul>
+    </article>
+  </div>
+</div></section>
+</div>
+</main>
+"""+contact()
+open(os.path.join(OUT,'extracurriculars.html'),'w').write(extra)
+print('extracurriculars ok')

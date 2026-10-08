@@ -94,6 +94,23 @@ $$('canvas[data-dots]').forEach(cv=>{const c=cv.getContext('2d');let W,H,D,pts=[
     if(!reduce)requestAnimationFrame(f)};
   lay();addEventListener('resize',lay);requestAnimationFrame(f)});
 
+
+/* extracurriculars: swim lanes */
+$$('canvas[data-pool]').forEach(cv=>{const c=cv.getContext('2d');let W,H,D;const sw=[...Array(8)].map((_,i)=>({x:Math.random(),v:(0.05+Math.random()*0.035)*(i===3?1.18:1),dir:1}));
+  const lay=()=>{const r=cv.getBoundingClientRect();D=Math.min(2,devicePixelRatio||1);W=r.width;H=r.height;cv.width=W*D;cv.height=H*D};
+  let last=performance.now();
+  const f=t=>{const dt=Math.min(0.05,(t-last)/1000);last=t;c.setTransform(D,0,0,D,0,0);c.clearRect(0,0,W,H);const lane=H/8,m=W*0.04;
+    c.fillStyle='rgba(255,255,255,0.05)';c.fillRect(m-2,0,2,H);c.fillRect(W-m,0,2,H);
+    for(let i=0;i<=8;i++){const y=i*lane;for(let x=m;x<W-m;x+=10){const red=x<m+W*0.07||x>W-m-W*0.07;c.fillStyle=red?'rgba(255,107,107,0.55)':(i%2?'rgba(255,255,255,0.35)':'rgba(91,140,255,0.5)');c.beginPath();c.arc(x,y,2.2,0,7);c.fill()}}
+    for(let i=0;i<8;i++){const y=i*lane+lane/2;c.fillStyle='rgba(0,0,0,0.25)';c.fillRect(m,y-1,W-2*m,2)}
+    sw.forEach((s,i)=>{if(!reduce){s.x+=s.v*dt*s.dir;if(s.x>1){s.x=1;s.dir=-1}if(s.x<0){s.x=0;s.dir=1}}const x=m+12+s.x*(W-2*m-24),y=i*lane+lane/2;
+      for(let k=1;k<10;k++){c.fillStyle=`rgba(191,230,255,${0.16*(1-k/10)})`;c.beginPath();c.arc(x-s.dir*k*5,y+Math.sin(t/120+k)*1.5,Math.max(1,3-k*0.2),0,7);c.fill()}
+      c.beginPath();c.arc(x,y,i===3?5.5:4,0,7);c.fillStyle=i===3?'#ffffff':'rgba(191,230,255,0.75)';c.fill();
+      if(i===3){c.font='11px "IBM Plex Mono", monospace';c.fillStyle='#ffffff';c.fillText('TN',x+(s.dir>0?10:-26),y-8)}});
+    c.font='11px "IBM Plex Mono", monospace';c.fillStyle='rgba(191,230,255,0.45)';for(let i=0;i<8;i++)c.fillText(String(i+1),6,i*lane+lane/2+4);
+    if(!reduce)requestAnimationFrame(f)};
+  lay();addEventListener('resize',lay);requestAnimationFrame(f)});
+
 /* ---------- charts (finance page) ---------- */
 const tip=document.createElement('div');tip.className='tip';document.body.appendChild(tip);
 const showTip=(e,html)=>{tip.innerHTML=html;tip.style.opacity=1;const x=Math.min(innerWidth-tip.offsetWidth-12,e.clientX+14),y=Math.min(innerHeight-tip.offsetHeight-12,e.clientY+14);tip.style.left=x+'px';tip.style.top=y+'px'};

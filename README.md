@@ -9,6 +9,7 @@ Live at **https://tuhlee15.github.io**
 | `simulator.html` | Helix Ops flight-operations and dispatch simulator (self-contained) |
 | `global-portfolios.html` | Crummer Truist Portfolio: utilities research, AEP and NFG |
 | `h1b-employer-research.html` | Employer research (in progress) |
+| `extracurriculars.html` | Varsity swimming and Crummer leadership roles |
 
 `site.css` and `site.js` are shared by every page. Images sit next to the pages, and there are no folders, so uploading through GitHub's web page can't break the layout.
 

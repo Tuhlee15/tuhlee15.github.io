@@ -21,7 +21,7 @@ def nav(cur=''):
     li=f'<a class="gh" href="{LINKEDIN}" rel="noopener">LinkedIn ↗</a>' if LINKEDIN else ''
     return f'''<header class="nav"><div class="wrap">
   <a class="brand" href="index.html"><span class="mark">TN</span>Tully Njoroge</a>
-  <nav aria-label="Main">{a("index.html#work","Work","work")}{a("helix-logistics.html","Helix","helix")}{a("global-portfolios.html","Finance","fin")}{a("index.html#about","About","about")}{li}<a class="gh" href="{GH}" rel="noopener">GitHub ↗</a></nav>
+  <nav aria-label="Main">{a("index.html#work","Work","work")}{a("helix-logistics.html","Helix","helix")}{a("global-portfolios.html","Finance","fin")}{a("extracurriculars.html","Extracurriculars","extra")}{a("index.html#about","About","about")}{li}<a class="gh" href="{GH}" rel="noopener">GitHub ↗</a></nav>
 </div></header>'''
 def contact():
     li=f'<a class="btn" href="{LINKEDIN}" rel="noopener">LinkedIn <span class="arr">→</span></a>' if LINKEDIN else ''
