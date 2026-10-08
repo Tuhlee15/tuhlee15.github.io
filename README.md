@@ -10,14 +10,16 @@ Personal portfolio site, hosted free on GitHub Pages.
 
 ## Structure
 
+Every file sits in the top level of the repository (no folders), so uploading through GitHub's web page can't flatten or break anything.
+
 ```
-index.html                         home page (project index)
-assets/site.css                    shared styles (light + dark)
-assets/helix-logo.png, helix-console.jpg
-projects/helix-logistics/index.html      case study (thesis & background)
-projects/helix-logistics/simulator.html  the simulator (one self-contained file)
-projects/h1b-employer-research/index.html
-projects/global-portfolios/index.html
+index.html                  home page (project index)
+helix-logistics.html        Helix case study (thesis & background)
+simulator.html              Helix Ops simulator (one self-contained file)
+h1b-employer-research.html
+global-portfolios.html
+site.css                    shared styles (light + dark)
+helix-logo.png, helix-console.jpg
 ```
 
 Plain HTML, CSS and JavaScript. No build step and nothing to install.
@@ -27,15 +29,15 @@ Plain HTML, CSS and JavaScript. No build step and nothing to install.
 1. Sign in at github.com, click **+** (top right) → **New repository**.
 2. Name it exactly **`YOUR-USERNAME.github.io`** (your GitHub username). Set it to **Public** and leave every "initialize" box unchecked. Click **Create repository**.
 3. On the empty repo page, click **uploading an existing file**.
-4. Unzip `tully-portfolio.zip` on your computer, open the folder, select **everything inside it** (`index.html`, `README.md`, `assets`, `projects`) and drag it onto the upload area. Chrome or Edge keep the folders intact.
+4. Unzip `tully-portfolio.zip`, open the folder, select **all the files inside it** and drag them onto the upload area.
 5. Scroll down and click **Commit changes**.
 6. Go to **Settings → Pages**. Under *Build and deployment*, set Source to **Deploy from a branch**, Branch to **main** and folder **/ (root)**, then click **Save**.
-7. After 1–2 minutes the site is live at **https://YOUR-USERNAME.github.io**. The simulator is at `/projects/helix-logistics/simulator.html`.
+7. After 1–2 minutes the site is live at **https://YOUR-USERNAME.github.io**. The simulator is at `/simulator.html`.
 
 ## After it's live
 
 - **Add your links:** open `index.html` on GitHub, click the pencil icon, and replace `YOUR-LINKEDIN` and `YOUR-USERNAME` in the *About* section. Commit, and the site updates within a minute.
-- **Add a project:** copy `projects/global-portfolios/` to a new folder, edit the text, then add a card for it in `index.html`.
+- **Add a project:** copy `global-portfolios.html` under a new name, edit the text, then add a card for it in `index.html`.
 - **Custom domain (optional):** buy a domain such as `tullynjoroge.com` (about $10–15 a year), then enter it under **Settings → Pages → Custom domain** and follow GitHub's DNS instructions.
 
 ## Disclaimer
