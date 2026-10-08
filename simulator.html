@@ -1,0 +1,1142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Helix Ops Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen ops console. Header bar / [map | side panel] / event log. Single committed dark look (Helix navy). */
+:root{
+  color-scheme: dark;
+  --bg:#050c20; --panel:#0a1532; --panel2:#0e1c42; --line:#1b2b5a; --line2:#26397a;
+  --text:#dfe7ff; --muted:#8393c2; --dim:#5a6a9c;
+  --accent:#4c8dff; --accent2:#a9c6ff;
+  --ok:#3ddc97; --warn:#ffb547; --crit:#ff5468; --air:#c58bff; --water:#14407a; --land:#08122c;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--f-body);font-size:14px;margin:0;overflow:hidden}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+#app{height:100%;display:grid;grid-template-rows:auto 1fr auto;min-height:0}
+
+/* header */
+.top{display:flex;align-items:center;gap:14px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{height:30px;width:auto}
+.brand b{font-family:var(--f-display);font-weight:700;letter-spacing:.14em;font-size:18px}
+.brand span{font-family:var(--f-display);color:var(--muted);letter-spacing:.08em;font-size:13px;text-transform:uppercase}
+.tabs{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:2px}
+.tabs button{background:none;border:0;padding:5px 14px;border-radius:4px;font-family:var(--f-display);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-size:13px}
+.tabs button[aria-pressed="true"]{background:var(--accent);color:#04102e}
+.clocks{display:flex;gap:14px;margin-left:auto;align-items:baseline}
+.clock{display:flex;flex-direction:column;line-height:1.1}
+.clock small{font-family:var(--f-display);color:var(--muted);letter-spacing:.1em;font-size:11px}
+.clock span{font-family:var(--f-mono);font-size:15px}
+.simctl{display:flex;gap:6px;align-items:center}
+.btn{background:var(--panel2);border:1px solid var(--line2);border-radius:5px;padding:5px 11px;font-family:var(--f-display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#04102e}
+.btn.danger{border-color:#6e2232;color:#ffb3bd}
+.btn.danger:hover{border-color:var(--crit)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.seg{display:flex;border:1px solid var(--line2);border-radius:5px;overflow:hidden}
+.seg button{background:var(--panel2);border:0;border-right:1px solid var(--line2);padding:5px 8px;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--line2);color:var(--text)}
+
+/* main */
+.main{display:grid;grid-template-columns:minmax(0,1fr) 430px;min-height:0}
+.mapwrap{position:relative;min-height:0;min-width:0;background:var(--land);overflow:hidden}
+#map{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#map.dragging{cursor:grabbing}
+.mapctl{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px}
+.mapctl button{width:34px;height:30px;background:rgba(10,21,50,.9);border:1px solid var(--line2);border-radius:5px;font-family:var(--f-mono)}
+.mapctl button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent2)}
+.legend{position:absolute;left:12px;top:12px;background:rgba(5,12,32,.82);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:11.5px;color:var(--muted);display:grid;grid-template-columns:auto auto;gap:3px 12px;max-width:calc(100% - 80px)}
+.legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+#alerts{position:absolute;left:50%;transform:translateX(-50%);top:12px;width:min(560px,calc(100% - 120px));display:flex;flex-direction:column;gap:8px;z-index:5}
+.alert{background:rgba(10,21,50,.97);border:1px solid var(--line2);border-left:5px solid var(--accent);border-radius:6px;padding:10px 12px;box-shadow:0 8px 30px rgba(0,0,0,.45)}
+.alert.warning{border-left-color:var(--warn)}
+.alert.critical{border-left-color:var(--crit)}
+.alert.info{border-left-color:var(--accent)}
+.alert .ah{display:flex;gap:8px;align-items:center;font-family:var(--f-display);font-weight:600;letter-spacing:.04em;font-size:15px}
+.alert .ab{color:var(--muted);margin:4px 0 8px;line-height:1.4;font-size:13px}
+.alert .aa{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.alert .count{margin-left:auto;font-family:var(--f-mono);font-size:11px;color:var(--dim)}
+.tag{font-family:var(--f-mono);font-size:10.5px;padding:1px 6px;border-radius:3px;background:var(--line);color:var(--accent2);letter-spacing:.04em;white-space:nowrap}
+.tag.UTM{background:#2a1d55;color:#d4b8ff}.tag.FDI{background:#4a2a12;color:#ffcf8f}.tag.VV{background:#123a3a;color:#8ff0e0}
+.tag.UDC{background:#16305e;color:#a9c6ff}.tag.WIND{background:#1f3a22;color:#a8f0b5}.tag.ELS{background:#4d1622;color:#ffb3bd}
+.tag.VBL{background:#3a3a12;color:#f0ea8f}.tag.DISPATCH{background:#22284a;color:#c9d2f5}.tag.SYS{background:#22284a;color:#c9d2f5}
+#vcam{position:absolute;right:12px;bottom:12px;width:260px;background:rgba(5,12,32,.95);border:1px solid var(--line2);border-radius:6px;overflow:hidden;z-index:4}
+#vcam header{display:flex;justify-content:space-between;padding:5px 8px;font-family:var(--f-display);letter-spacing:.08em;font-size:12px;color:var(--muted);text-transform:uppercase}
+#vcamc{display:block;width:100%;height:auto;aspect-ratio:4/3}
+#guide{position:absolute;left:12px;bottom:12px;width:min(420px,calc(100% - 300px));background:rgba(10,21,50,.97);border:1px solid var(--accent);border-radius:8px;padding:12px 14px;z-index:6;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+#guide .gs{font-family:var(--f-display);letter-spacing:.12em;font-size:12px;color:var(--accent2);text-transform:uppercase}
+#guide h3{margin:2px 0 6px;font-family:var(--f-display);font-size:19px;font-weight:600;letter-spacing:.02em}
+#guide p{margin:0 0 10px;color:var(--muted);line-height:1.45;font-size:13.5px}
+#guide .gb{display:flex;gap:6px;flex-wrap:wrap}
+
+/* side panel */
+.side{background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;min-height:0;padding:12px 14px 20px;display:flex;flex-direction:column;gap:12px}
+.card{border:1px solid var(--line);border-radius:7px;background:var(--bg)}
+.card>h4{margin:0;padding:8px 10px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);font-family:var(--f-display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:13.5px}
+.card>h4 .chip{margin-left:auto}
+.card .cb{padding:10px}
+.chip{font-family:var(--f-display);font-weight:600;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:20px;border:1px solid;white-space:nowrap}
+.chip.ok{color:var(--ok);border-color:rgba(61,220,151,.45);background:rgba(61,220,151,.08)}
+.chip.warn{color:var(--warn);border-color:rgba(255,181,71,.5);background:rgba(255,181,71,.08)}
+.chip.crit{color:var(--crit);border-color:rgba(255,84,104,.55);background:rgba(255,84,104,.1)}
+.chip.info{color:var(--accent2);border-color:rgba(76,141,255,.5);background:rgba(76,141,255,.1)}
+.chip.idle{color:var(--muted);border-color:var(--line2)}
+.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kv div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.kv small,.lbl{font-family:var(--f-display);color:var(--muted);letter-spacing:.1em;font-size:11px;text-transform:uppercase}
+.kv span{font-family:var(--f-mono);font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.achead{display:flex;flex-direction:column;gap:8px}
+.achead .row1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.achead .cs{font-family:var(--f-display);font-weight:700;font-size:24px;letter-spacing:.06em}
+.achead select{background:var(--panel2);border:1px solid var(--line2);border-radius:5px;padding:3px 6px;margin-left:auto}
+.sub{color:var(--muted);font-size:13px;line-height:1.4}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.ctl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.ctl .btn{padding:6px 4px;font-size:12px}
+.motors{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-bottom:8px}
+.motor{border:1px solid var(--line2);border-radius:4px;padding:3px 5px;font-family:var(--f-mono);font-size:11px;line-height:1.3;background:var(--panel)}
+.motor b{font-family:var(--f-display);font-size:12px;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.motor.on{border-color:rgba(61,220,151,.5)}
+.motor.warn{border-color:var(--warn);background:rgba(255,181,71,.08)}
+.motor.bad{border-color:var(--crit);background:rgba(255,84,104,.1)}
+.motor.idle{opacity:.55}
+.grp{font-family:var(--f-display);color:var(--dim);letter-spacing:.1em;font-size:10.5px;text-transform:uppercase;margin:2px 0 4px}
+canvas.spark{width:100%;height:70px;display:block;background:var(--panel);border:1px solid var(--line);border-radius:4px}
+.checks{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:3px;font-size:12.5px}
+.checks li{display:flex;justify-content:space-between;gap:8px}
+.checks li span:last-child{font-family:var(--f-mono);font-size:11.5px}
+.c-ok{color:var(--ok)}.c-warn{color:var(--warn)}.c-crit{color:var(--crit)}.c-muted{color:var(--muted)}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+table.t th{font-family:var(--f-display);color:var(--muted);letter-spacing:.08em;font-size:11px;text-transform:uppercase;text-align:left;font-weight:600;padding:3px 4px;border-bottom:1px solid var(--line)}
+table.t td{padding:4px 4px;border-bottom:1px solid rgba(27,43,90,.6);font-family:var(--f-mono);font-size:11.5px;white-space:nowrap}
+table.t tr.click{cursor:pointer}
+table.t tr.click:hover td{background:var(--panel2)}
+table.t tr.sel td{background:rgba(76,141,255,.12)}
+.stream{font-family:var(--f-mono);font-size:10.5px;line-height:1.5;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:6px 8px;margin-top:8px;height:96px;overflow:hidden;color:var(--accent2);white-space:pre}
+.windrow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;align-items:center}
+#windc{width:120px;height:120px}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.kpi{border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:var(--bg)}
+.kpi b{display:block;font-family:var(--f-mono);font-size:22px;font-weight:500}
+.kpi small{font-family:var(--f-display);color:var(--muted);letter-spacing:.08em;font-size:11px;text-transform:uppercase}
+.order{border:1px solid var(--line);border-left:4px solid var(--line2);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:5px;background:var(--panel)}
+.order.STAT{border-left-color:var(--crit)}.order.SCHED{border-left-color:var(--accent)}.order.RETURN{border-left-color:var(--dim)}
+.order .r1{display:flex;gap:8px;align-items:center}
+.order .r1 b{font-family:var(--f-display);font-size:15px;font-weight:600;letter-spacing:.02em}
+.order .r1 .mono{margin-left:auto;color:var(--muted);font-size:11px}
+.order .r3{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.order select{background:var(--panel2);border:1px solid var(--line2);border-radius:5px;padding:4px 6px;font-size:12.5px;max-width:100%}
+.orders{display:flex;flex-direction:column;gap:8px}
+form.newreq{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+form.newreq label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+form.newreq select{background:var(--panel2);border:1px solid var(--line2);border-radius:5px;padding:5px 6px;color:var(--text)}
+form.newreq .full{grid-column:1/-1}
+details>summary{cursor:pointer;list-style:none}
+details>summary::-webkit-details-marker{display:none}
+.empty{color:var(--dim);font-size:13px;padding:6px 2px}
+
+/* log */
+.log{background:var(--panel);border-top:1px solid var(--line);height:132px;display:grid;grid-template-columns:auto minmax(0,1fr);min-height:0}
+.log .lh{padding:8px 12px;border-right:1px solid var(--line);font-family:var(--f-display);letter-spacing:.1em;color:var(--muted);font-size:12px;text-transform:uppercase;display:flex;flex-direction:column;gap:6px}
+#log{overflow-y:auto;padding:6px 12px;font-size:12.5px;min-width:0}
+#log div{display:grid;grid-template-columns:62px 74px minmax(0,1fr);gap:8px;padding:2px 0;border-bottom:1px solid rgba(27,43,90,.5);align-items:baseline}
+#log div .mono{color:var(--dim);font-size:11.5px}
+#log div.warning span:last-child{color:#ffd59a}
+#log div.critical span:last-child{color:#ffb3bd}
+
+/* modals */
+.modal{position:fixed;inset:0;background:rgba(2,6,18,.72);display:flex;align-items:center;justify-content:center;z-index:20;padding:16px}
+.modal .box{background:var(--panel);border:1px solid var(--line2);border-radius:10px;width:min(720px,100%);max-height:calc(100% - 32px);overflow-y:auto;padding:18px 20px}
+.modal h2{margin:0 0 4px;font-family:var(--f-display);font-weight:700;letter-spacing:.04em;font-size:24px}
+.modal p{color:var(--muted);line-height:1.5;margin:6px 0}
+.evgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:12px}
+.ev{text-align:left;background:var(--bg);border:1px solid var(--line2);border-radius:7px;padding:10px;display:flex;flex-direction:column;gap:5px}
+.ev:hover{border-color:var(--accent)}
+.ev b{font-family:var(--f-display);font-size:16px;font-weight:600;letter-spacing:.02em}
+.ev span{color:var(--muted);font-size:12.5px;line-height:1.35}
+.intro .box{width:min(640px,100%)}
+.intro .ctas{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.intro .facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.intro .facts div{border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.intro .facts b{display:block;font-family:var(--f-mono);font-size:17px;font-weight:500}
+.intro .facts small{color:var(--muted);font-size:12px}
+.about h3{font-family:var(--f-display);letter-spacing:.06em;text-transform:uppercase;font-size:14px;margin:16px 0 4px;color:var(--accent2)}
+.about ul{margin:4px 0;padding-left:18px;color:var(--muted);line-height:1.5}
+.disclaim{font-size:12px;color:var(--dim);border-top:1px solid var(--line);padding-top:10px;margin-top:14px;line-height:1.5}
+
+@media (max-width:1100px){
+  .main{grid-template-columns:minmax(0,1fr) 360px}
+}
+@media (max-width:820px){
+  body{overflow:auto}
+  #app{height:auto;display:block}
+  .main{display:block}
+  .mapwrap{height:62vh;min-height:380px}
+  .side{border-left:0;border-top:1px solid var(--line);overflow:visible}
+  .log{height:220px}
+  .clocks{margin-left:0}
+  .legend{display:none}
+  #alerts{width:calc(100% - 70px);left:12px;transform:none}
+  #guide{width:calc(100% - 24px);bottom:auto;top:auto;bottom:12px}
+  #vcam{width:180px;bottom:auto;top:12px;right:56px}
+  .intro .facts{grid-template-columns:1fr}
+  .simctl{flex-wrap:wrap}
+  .brand span{display:none}
+  .stream{overflow-x:auto}
+  .top{gap:10px}
+  #log div{grid-template-columns:58px minmax(0,1fr)}
+  #log div>span:nth-child(2){display:none}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+
+
+<div id="app">
+  <header class="top">
+    <div class="brand"><a href="index.html" style="color:var(--muted);text-decoration:none;font-family:var(--f-display);letter-spacing:.08em;font-size:13px;margin-right:6px" title="Back to the project page">←</a><img src="data:image/png;base64,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" alt="Helix Logistics logo"><b>HELIX OPS</b><span>Flight operations · Dispatch</span></div>
+    <div class="tabs" role="tablist" aria-label="Console view">
+      <button id="tabOps" aria-pressed="true" data-view="ops">Flight Ops</button>
+      <button id="tabDisp" aria-pressed="false" data-view="dispatch">Dispatch</button>
+    </div>
+    <div class="clocks">
+      <div class="clock"><small>LOUISVILLE · EDT</small><span id="clkE">07:40:00</span></div>
+      <div class="clock"><small>PADUCAH · CDT</small><span id="clkC">06:40:00</span></div>
+    </div>
+    <div class="simctl">
+      <button class="btn primary" id="playBtn" aria-label="Play or pause the simulation">▶ Run</button>
+      <div class="seg" id="speedSeg" aria-label="Simulation speed">
+        <button data-speed="1">1×</button><button data-speed="10">10×</button><button data-speed="30" aria-pressed="true">30×</button><button data-speed="60">60×</button><button data-speed="120">120×</button>
+      </div>
+      <button class="btn" id="injectBtn">⚡ Inject event</button>
+      <button class="btn" id="demoBtn">Guided demo</button>
+      <button class="btn" id="aboutBtn" aria-label="About this simulator">About</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="mapwrap" aria-label="Airspace map">
+      <canvas id="map"></canvas>
+      <div class="legend" aria-hidden="true">
+        <span><i style="border-color:var(--accent)"></i>Helix route</span>
+        <span><i style="border-color:var(--air);border-top-style:dashed"></i>Controlled airspace</span>
+        <span><i style="border-color:#ff7a59"></i>Restricted / TFR</span>
+        <span><i style="border-color:#6fa0e8"></i>Rivers &amp; lakes</span>
+      </div>
+      <div class="mapctl">
+        <button id="zIn" aria-label="Zoom in">+</button>
+        <button id="zOut" aria-label="Zoom out">−</button>
+        <button id="zFit" aria-label="Fit map to region" title="Fit region">⤢</button>
+        <button id="follow" aria-pressed="false" aria-label="Follow selected aircraft" title="Follow selected aircraft">◎</button>
+      </div>
+      <div id="alerts" aria-live="polite"></div>
+      <div id="vcam" hidden><header><span>Vision landing</span><span id="vcamStat">—</span></header><canvas id="vcamc" width="520" height="390"></canvas></div>
+      <div id="guide" hidden></div>
+    </section>
+
+    <aside class="side" id="side">
+      <div id="viewOps"></div>
+      <div id="viewDispatch" hidden>
+        <div class="kpis" id="kpis"></div>
+        <div class="card" style="margin-top:12px">
+          <h4>Delivery requests <span class="chip info" id="qCount">0</span></h4>
+          <div class="cb"><div class="orders" id="orders"></div></div>
+        </div>
+        <details class="card" style="margin-top:12px">
+          <summary><h4 style="border-bottom:0">＋ New delivery request <span class="chip idle">Form</span></h4></summary>
+          <div class="cb">
+            <form class="newreq" id="newReq">
+              <label class="full">Item<select id="nrItem"></select></label>
+              <label>Destination<select id="nrDest"></select></label>
+              <label>Priority<select id="nrPri"><option value="STAT">STAT · surgery today</option><option value="SCHED">Scheduled case</option></select></label>
+              <div class="full"><button class="btn primary" type="submit">Add to queue</button></div>
+            </form>
+          </div>
+        </details>
+        <div class="card" style="margin-top:12px">
+          <h4>Active missions</h4>
+          <div class="cb" id="missions"></div>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h4>Fleet · Chaparral-class</h4>
+          <div class="cb" style="overflow-x:auto" id="fleet"></div>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h4>Field weather</h4>
+          <div class="cb" style="overflow-x:auto" id="wx"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="log">
+    <div class="lh">Event log<button class="btn" id="logClear" style="font-size:11px;padding:3px 6px">Clear</button></div>
+    <div id="log" aria-live="off"></div>
+  </footer>
+</div>
+
+<div class="modal" id="injectModal" hidden>
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="injT">
+    <h2 id="injT">Inject an event</h2>
+    <p>Each event exercises one capability. Choose the target aircraft, then an event. The console detects it, responds, and asks you to decide when a human call is needed.</p>
+    <label class="lbl" for="injTarget">Target aircraft</label><br>
+    <select id="injTarget" style="background:var(--panel2);border:1px solid var(--line2);border-radius:5px;padding:5px 8px;margin-top:4px"></select>
+    <div class="evgrid" id="evgrid"></div>
+    <div style="margin-top:14px;text-align:right"><button class="btn" id="injClose">Close</button></div>
+  </div>
+</div>
+
+<div class="modal intro" id="intro">
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="introT">
+    <div class="brand" style="margin-bottom:8px"><img src="data:image/png;base64,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" alt=""><b>HELIX LOGISTICS</b></div>
+    <h2 id="introT">Flight operations &amp; dispatch simulator</h2>
+    <p>Autonomous middle-mile delivery of orthopedic implants from a Louisville distribution hub to hospitals and surgery centers in Paducah and western Kentucky. You are the dispatcher and remote operator for a fleet of Chaparral-class hybrid-electric VTOL cargo aircraft.</p>
+    <div class="facts">
+      <div><b>~152 nm</b><small>Louisville → Paducah, about 85 min in the air</small></div>
+      <div><b>3 h 25 m</b><small>Same trip by ground courier</small></div>
+      <div><b>7</b><small>Flight-safety capabilities you can test</small></div>
+    </div>
+    <div class="ctas">
+      <button class="btn primary" id="startDemo">Run the guided demo · ~4 min</button>
+      <button class="btn" id="startFree">Explore on my own</button>
+    </div>
+    <p class="disclaim">Concept simulation built from the Helix Logistics MBA capstone (Crummer Graduate School of Business × NASA Kennedy Space Center). Capabilities are modeled on technologies the team evaluated from NASA's public technology-transfer catalog; no licenses were obtained. Aircraft performance is an estimate for a Chaparral-class vehicle. Not affiliated with or endorsed by NASA or Elroy Air. Facilities are generic.</p>
+  </div>
+</div>
+
+<div class="modal about" id="aboutModal" hidden>
+  <div class="box" role="dialog" aria-modal="true" aria-labelledby="aboutT">
+    <h2 id="aboutT">About this simulator</h2>
+    <p>A rebuild of the Helix Logistics prototype: the flight operations console and dispatcher dashboard a remote operator would use to run autonomous medical cargo flights in shared, low-altitude airspace.</p>
+    <h3>What each panel demonstrates</h3>
+    <ul>
+      <li><b>UAS Traffic Management (UTM)</b>: shares flight intent, predicts loss of separation up to 3 minutes ahead and issues altitude resolutions; reroutes around pop-up flight restrictions.</li>
+      <li><b>Fault Detection &amp; Isolation (FDI)</b>: compares every motor's current and temperature to a model, isolates the faulty unit and redistributes thrust.</li>
+      <li><b>Near-real-time Verification &amp; Validation (V&amp;V)</b>: runtime monitors check geofence, altitude band, energy reserve, navigation integrity and trajectory conformance.</li>
+      <li><b>Universal Data Compiler (UDC)</b>: fuses LTE, SATCOM, ADS-B, Remote ID and onboard data into one telemetry stream, with failover.</li>
+      <li><b>Wind estimation</b>: infers wind from the aircraft's own motion (ground velocity minus air velocity) and re-plans speed, altitude and ETA.</li>
+      <li><b>Emergency landing</b>: ranks reachable landing sites by population exposure, distance and surface type.</li>
+      <li><b>Vision-based landing</b>: locks onto the landing pad with a downward camera when GPS is degraded or visibility is low.</li>
+    </ul>
+    <h3>Aircraft assumptions (Chaparral-class)</h3>
+    <ul>
+      <li>Hybrid-electric VTOL: 8 lift propellers, 4 cruise propellers, turbine-generator plus battery.</li>
+      <li>Payload 300–500 lb in a detachable cargo pod; range about 300 statute miles (published figures).</li>
+      <li>Cruise 110 kt, battery 40 kWh, generator 130 kW (modeling assumptions; the manufacturer has not published these).</li>
+    </ul>
+    <h3>Team</h3>
+    <p>Tully Njoroge, Abby DeGroat, Tim Cook, Max Farrell, Quinn Mäensivu, Jack Johnstone, Amelia Kondal.</p>
+    <p class="disclaim">Concept simulation for portfolio purposes. Capabilities are modeled on technologies evaluated from NASA's public technology-transfer catalog; no licenses were obtained. Not affiliated with or endorsed by NASA or Elroy Air. Geography is simplified; facilities, aircraft registrations and traffic are fictional.</p>
+    <div style="text-align:right;margin-top:10px"><button class="btn" id="aboutClose">Close</button></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ================= geometry ================= */
+const LAT0=37.6, LON0=-87.15, KX=111.32*Math.cos(LAT0*Math.PI/180), KY=110.57;
+const xy=(lat,lon)=>({x:(lon-LON0)*KX,y:(lat-LAT0)*KY});
+const toLL=(x,y)=>({lat:y/KY+LAT0,lon:x/KX+LON0});
+const KT=1.852/3600, NM=1.852;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const pad2=n=>String(n).padStart(2,'0');
+const fmtInt=n=>Math.round(n).toLocaleString('en-US');
+let seed=20250412;
+function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}
+const gauss=()=>{let u=rnd()||1e-9,v=rnd();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+function projSeg(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy||1e-9;let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/L2;t=clamp(t,0,1);const x=a.x+t*dx,y=a.y+t*dy;const side=Math.sign(dx*(p.y-a.y)-dy*(p.x-a.x));return{t,x,y,d:Math.hypot(p.x-x,p.y-y),side}}
+function routeLen(pts){let L=0;for(let i=1;i<pts.length;i++)L+=dist(pts[i-1],pts[i]);return L}
+function pointAlong(pts,d){for(let i=1;i<pts.length;i++){const L=dist(pts[i-1],pts[i]);if(d<=L){const t=L?d/L:0;return{x:pts[i-1].x+(pts[i].x-pts[i-1].x)*t,y:pts[i-1].y+(pts[i].y-pts[i-1].y)*t,seg:i}}d-=L}const e=pts[pts.length-1];return{x:e.x,y:e.y,seg:pts.length-1}}
+const bearing=(a,b)=>((Math.atan2(b.x-a.x,b.y-a.y)*180/Math.PI)+360)%360;
+const polyKm=arr=>arr.map(([la,lo])=>xy(la,lo));
+
+/* ================= world data ================= */
+const FAC={
+  LOU:{name:'Louisville Distribution Hub',short:'LOU HUB',lat:38.130,lon:-85.800,type:'hub',tz:'E'},
+  PRH:{name:'Paducah Regional Hospital',short:'PAH RGNL',lat:37.082,lon:-88.668,type:'hospital',tz:'C'},
+  POS:{name:'Paducah Orthopedic Surgery Ctr',short:'PAH ORTHO',lat:37.058,lon:-88.588,type:'hospital',tz:'C'},
+  PVP:{name:'Helix Paducah Vertiport',short:'PAH VPT',lat:37.046,lon:-88.752,type:'vertiport',tz:'C'},
+  OWB:{name:'Owensboro Medical Center',short:'OWENSBORO MC',lat:37.735,lon:-87.150,type:'hospital',tz:'C'},
+  MDV:{name:'Madisonville Regional Hospital',short:'MADISONVILLE',lat:37.318,lon:-87.488,type:'hospital',tz:'C'},
+  MUR:{name:'Murray Medical Center',short:'MURRAY MC',lat:36.608,lon:-88.318,type:'hospital',tz:'C'},
+  BWG:{name:'Bowling Green Medical Center',short:'BOWLING GRN MC',lat:36.988,lon:-86.455,type:'hospital',tz:'C'},
+  ETN:{name:'Elizabethtown Medical Center',short:'E-TOWN MC',lat:37.700,lon:-85.875,type:'hospital',tz:'E'},
+};
+for(const k in FAC){Object.assign(FAC[k],xy(FAC[k].lat,FAC[k].lon));FAC[k].id=k;FAC[k].wx={wind:'',vis:10,ceil:4500,fog:false}}
+const TOWNS=[['Louisville',38.25,-85.76,14,620],['Elizabethtown',37.69,-85.86,5,31],['Radcliff',37.84,-85.95,3.5,23],['Shepherdsville',37.99,-85.72,3,14],['Bardstown',37.81,-85.47,3,13],['Owensboro',37.77,-87.11,7,60],['Bowling Green',36.97,-86.44,7,72],['Evansville',37.97,-87.56,10,117],['Henderson',37.84,-87.59,4,28],['Madisonville',37.33,-87.50,4,19],['Hopkinsville',36.87,-87.49,5,31],['Paducah',37.08,-88.62,6,27],['Murray',36.61,-88.31,3.5,18],['Mayfield',36.74,-88.64,3,10],['Princeton',37.11,-87.88,2,6],['Leitchfield',37.48,-86.29,2,6],['Hardinsburg',37.78,-86.46,1.5,2],['Central City',37.29,-87.12,2,6],['Beaver Dam',37.40,-86.88,1.8,3],['Greenville',37.20,-87.18,1.8,4],['Dawson Springs',37.17,-87.69,1.4,3],['Eddyville',37.09,-88.08,1.4,2],['Calvert City',37.03,-88.35,1.8,3],['Brandenburg',38.00,-86.17,1.5,3],['Morganfield',37.68,-87.92,1.5,4]].map(([n,la,lo,r,p])=>({name:n,...xy(la,lo),r,pop:p}));
+const AIRSPACE=[['SDF',38.174,-85.736,[5,10],'SDF CLASS C'],['EVV',37.995,-87.530,[5,10],'EVV CLASS C'],['PAH',37.061,-88.774,[4.3],'PAH CLASS D'],['OWB',37.740,-87.167,[4.3],'OWB CLASS D'],['BWG',36.964,-86.420,[4.3],'BWG CLASS D']].map(([id,la,lo,r,l])=>({id,...xy(la,lo),r:r.map(v=>v*NM),label:l}));
+const RESTRICTED=[['R-3704',37.86,-85.99,12.5,'R-3704 FORT KNOX'],['R-3702',36.66,-87.48,11,'R-3702 FT CAMPBELL']].map(([id,la,lo,r,l])=>({id,...xy(la,lo),r,label:l}));
+const RIVERS={
+  ohio:polyKm([[38.80,-84.95],[38.74,-85.38],[38.60,-85.45],[38.42,-85.60],[38.28,-85.75],[38.24,-85.83],[38.10,-85.90],[38.00,-86.00],[37.98,-86.15],[38.03,-86.30],[37.90,-86.52],[37.92,-86.75],[37.85,-86.90],[37.78,-87.05],[37.80,-87.20],[37.93,-87.40],[37.97,-87.55],[37.83,-87.62],[37.79,-87.80],[37.78,-87.95],[37.68,-88.10],[37.50,-88.17],[37.40,-88.40],[37.24,-88.47],[37.14,-88.43],[37.08,-88.58],[37.10,-88.70],[37.15,-88.90],[37.07,-89.05],[36.99,-89.13]]),
+  miss:polyKm([[37.60,-89.52],[37.20,-89.46],[36.99,-89.13],[36.85,-89.15],[36.60,-89.50],[36.30,-89.55]]),
+  tenn:polyKm([[37.08,-88.57],[37.02,-88.28],[36.95,-88.24],[36.80,-88.12],[36.60,-88.07],[36.30,-88.04]]),
+  cumb:polyKm([[37.14,-88.41],[37.05,-88.18],[36.95,-88.03],[36.75,-87.95],[36.55,-87.88],[36.30,-87.80]]),
+  green:polyKm([[37.92,-87.48],[37.75,-87.40],[37.55,-87.25],[37.40,-87.05],[37.25,-86.90],[37.20,-86.55],[37.10,-86.20],[37.20,-85.80]])
+};
+const LAKES=[polyKm([[36.97,-88.25],[36.80,-88.13],[36.60,-88.08],[36.30,-88.04]]),polyKm([[37.02,-88.08],[36.95,-88.03],[36.75,-87.95],[36.55,-87.88]])];
+const BORDERS=[polyKm([[36.50,-89.55],[36.50,-88.07],[36.68,-88.07],[36.64,-87.0],[36.63,-86.0],[36.59,-84.9]])];
+const STATE_LABELS=[['INDIANA',38.42,-86.75],['ILLINOIS',37.65,-88.85],['TENNESSEE',36.42,-86.9],['KENTUCKY',37.42,-86.05],['MISSOURI',36.85,-89.45]].map(([n,la,lo])=>({n,...xy(la,lo)}));
+const ROADS=[[[38.25,-85.76],[37.69,-85.86],[36.99,-86.44],[36.60,-86.56]],[[38.25,-85.76],[38.20,-86.20],[38.26,-86.85],[38.25,-87.60]],[[37.69,-85.86],[37.48,-86.29],[37.40,-86.88],[37.29,-87.12],[37.19,-87.45],[37.11,-87.88],[37.06,-88.06]],[[37.08,-88.62],[37.03,-88.35],[37.06,-88.06],[36.85,-87.60],[36.60,-87.30]],[[37.19,-87.45],[37.33,-87.50],[37.84,-87.58],[37.97,-87.56]],[[37.77,-87.11],[37.40,-86.88],[36.99,-86.44]],[[37.03,-88.35],[36.74,-88.64],[36.50,-88.87]]].map(polyKm);
+const FIXES=['BRNDN','HRDSB','CNTRT','DWSPR','EDYVL','GRNVL','MRGNF','LTCHF','PRNCT','KYLAK','SMTHL','BVRDM','HNDRS','CALVT','OHRIV','GLDEN','WSTPT','FALLS','TRIGG','BRKLY'];
+
+/* ================= sim state ================= */
+const START=7*3600+40*60;
+const ITEMS=[['Hip revision system',26],['Total knee system, size 5 + tray',41],['Lumbar fusion implant set',33],['Shoulder arthroplasty set',29],['Trauma plating kit',18],['Periprosthetic fracture kit',38],['Ankle fusion set',14]];
+let S;
+function fmtClock(t,tz='E',secs=true){let s=START+t-(tz==='C'?3600:0);s=((s%86400)+86400)%86400;const h=Math.floor(s/3600),m=Math.floor(s/60)%60,ss=Math.floor(s)%60;return pad2(h)+':'+pad2(m)+(secs?':'+pad2(ss):'')}
+const tzName=tz=>tz==='C'?'CDT':'EDT';
+function fmtDur(sec){sec=Math.max(0,Math.round(sec));const h=Math.floor(sec/3600),m=Math.floor(sec/60)%60;return h?`${h} h ${pad2(m)} m`:`${m} min`}
+function fmtMS(sec){sec=Math.max(0,Math.round(sec));return Math.floor(sec/60)+':'+pad2(sec%60)}
+function groundMin(a,b){return dist(a,b)*1.25/110*60+15}
+
+function log(mod,msg,sev='info'){S.log.unshift({t:S.t,mod,msg,sev});if(S.log.length>300)S.log.pop();S.logDirty=true}
+
+function makeAC(id,home){
+  const f=FAC[home];
+  const motors=[];for(let i=0;i<12;i++)motors.push({name:i<8?'L'+(i+1):'C'+(i-7),cur:0,pred:0,temp:22,tpred:22,rf:0,deg:0,failed:false,isolated:false,susp:0,bit:3});
+  return{id,home,at:home,x:f.x,y:f.y,alt:0,tas:0,gs:0,vs:0,hdg:250,trk:250,phase:'parked',timer:0,mission:null,route:[],wp:0,cruiseAlt:2000,utmOff:0,windAdj:0,cruiseTAS:110,
+    fuel:100,soc:92,genOK:true,genKw:0,demand:0,battKw:0,busV:760,cur:0,motors,navBias:{x:0,y:0},gnss:false,navMode:'GNSS + INS',navSusp:0,
+    link:{lte:true,sat:true,adsb:true,rid:true},linkRestore:0,west:{u:0,v:0},wref:null,wflag:0,xte:0,hist:[],histT:0,trail:[],trailT:0,utmRes:null,els:null,emergency:false,maint:[],airGround:{ax:0,ay:0,gx:0,gy:0},stream:[],streamT:0,hold:null,genFail:false};
+}
+function targetAlt(ac){return Math.max(800,ac.cruiseAlt+ac.utmOff+ac.windAdj)}
+const airborne=ac=>!['parked','unload','preflight','landed_off'].includes(ac.phase);
+
+function zonesFor(a,b){
+  const z=[];
+  for(const r of RESTRICTED)z.push({x:r.x,y:r.y,r:r.r});
+  for(const t of S.tfrs)z.push({x:t.x,y:t.y,r:t.r});
+  for(const t of TOWNS)if(t.r>=4)z.push({x:t.x,y:t.y,r:t.r+1.5});
+  return z.filter(c=>dist(a,c)>c.r+2.5&&dist(b,c)>c.r+2.5);
+}
+function planRoute(a,b){
+  const pts=[{x:a.x,y:a.y},{x:b.x,y:b.y}];const zones=zonesFor(a,b);
+  for(let it=0;it<16;it++){let hit=false;
+    for(let i=1;i<pts.length&&!hit;i++){for(const c of zones){const p=projSeg(c,pts[i-1],pts[i]);if(p.d<c.r*1.04&&p.t>0.001&&p.t<0.999){let dx=p.x-c.x,dy=p.y-c.y,L=Math.hypot(dx,dy);if(L<0.01){const sx=pts[i].x-pts[i-1].x,sy=pts[i].y-pts[i-1].y,sl=Math.hypot(sx,sy);dx=-sy/sl;dy=sx/sl;L=1}const w={x:c.x+dx/L*c.r*1.3,y:c.y+dy/L*c.r*1.3};pts.splice(i,0,w);hit=true;break}}}
+    if(!hit)break}
+  // insert intermediate fixes on long legs for a realistic flight plan
+  const out=[pts[0]];
+  for(let i=1;i<pts.length;i++){const L=dist(pts[i-1],pts[i]);const n=Math.floor(L/45);for(let k=1;k<=n;k++){const t=k/(n+1);out.push({x:pts[i-1].x+(pts[i].x-pts[i-1].x)*t,y:pts[i-1].y+(pts[i].y-pts[i-1].y)*t})}out.push(pts[i])}
+  out.forEach((p,i)=>{if(i>0&&i<out.length-1)p.name=FIXES[(Math.abs(Math.round(p.x*7+p.y*3)))%FIXES.length]});
+  return out;
+}
+function remaining(ac){if(!ac.route.length)return 0;let d=dist(ac,ac.route[Math.min(ac.wp,ac.route.length-1)]);for(let i=ac.wp+1;i<ac.route.length;i++)d+=dist(ac.route[i-1],ac.route[i]);return d}
+function etaSec(ac){const gs=Math.max(ac.gs,ac.phase==='preflight'?ac.cruiseTAS:30)*KT;return remaining(ac)/gs+(ac.phase==='preflight'?ac.timer+70:60)}
+
+function newMission(o,ac,opts={}){
+  const from=FAC[o.from],to=FAC[o.to];
+  const m={id:'M-'+(S.nextM++),order:o,from:o.from,to:o.to,item:o.item,kg:o.kg,pri:o.pri,caseT:o.caseT,tLaunch:S.t,kind:o.pri==='RETURN'?'return':'delivery',status:'active'};
+  ac.mission=m;ac.route=planRoute(from,to);ac.wp=1;ac.emergency=false;ac.els=null;
+  const brg=bearing(from,to);ac.cruiseAlt=opts.alt||((brg>180)?(o.pri==='STAT'?2000:1500):2500);
+  o.status='assigned';o.ac=ac.id;S.missions.push(m);
+  return m;
+}
+function launch(ac,o){
+  const m=newMission(o,ac);
+  ac.phase='preflight';ac.timer=90;ac.tas=0;
+  const extra=routeLen(ac.route)-dist(FAC[m.from],FAC[m.to]);
+  log('DISPATCH',`${ac.id} assigned ${o.id} · ${o.item} (${o.kg} kg) → ${FAC[o.to].short}. Flight plan ${(routeLen(ac.route)/NM).toFixed(0)} nm${extra>2?`, +${(extra/NM).toFixed(1)} nm to avoid restricted airspace and towns`:''}.`);
+  const auth=[];for(const a of AIRSPACE){if(dist(FAC[m.from],a)<a.r[a.r.length-1]||dist(FAC[m.to],a)<a.r[a.r.length-1])auth.push(a.id)}
+  log('UTM',`Operation volume approved for ${ac.id} at ${fmtInt(ac.cruiseAlt)} ft${auth.length?` · airspace authorization granted (${auth.join(', ')})`:''}.`);
+}
+function placeOnRoute(ac,frac){const L=routeLen(ac.route);const p=pointAlong(ac.route,L*frac);ac.x=p.x;ac.y=p.y;ac.wp=p.seg;ac.phase='cruise';ac.alt=targetAlt(ac);ac.tas=ac.cruiseTAS;ac.gs=ac.tas;const nx=ac.route[ac.wp];ac.hdg=ac.trk=bearing(ac,nx)}
+
+function initWorld(){
+  seed=20250412;
+  S={t:0,speed:30,paused:true,aircraft:[],traffic:[],orders:[],missions:[],log:[],alerts:[],tfrs:[],gusts:[],selected:'HX-201',view:'ops',nextM:2101,nextO:1045,nextT:1,
+     kpi:{delivered:6,onTime:6,protected:3,events:0,conflicts:0,saved:6*128*60},conflicts:[],demo:null,logDirty:true,lastOrderT:0,baseWind:{dir:235,spd:11},utmT:0,follow:false,forcedSlow:null};
+  ['HX-201','HX-202','HX-203','HX-204','HX-205','HX-206'].forEach((id,i)=>S.aircraft.push(makeAC(id,i===1||i===5?'PVP':'LOU')));
+  const A=id=>S.aircraft.find(a=>a.id===id);
+  const o1={id:'O-1040',item:'Periprosthetic fracture kit',kg:38,from:'LOU',to:'PRH',pri:'STAT',caseT:11100,status:'pending',created:-1800};
+  const o2={id:'O-1038',item:'Loaner instrument sets (2 trays)',kg:30,from:'PVP',to:'LOU',pri:'RETURN',caseT:null,status:'pending',created:-4000};
+  const o3={id:'O-1039',item:'Shoulder arthroplasty set',kg:29,from:'LOU',to:'OWB',pri:'SCHED',caseT:15600,status:'pending',created:-3000};
+  S.orders.push(o1,o2,o3);
+  newMission(o1,A('HX-201'));placeOnRoute(A('HX-201'),0.10);A('HX-201').fuel=93;A('HX-201').soc=74;A('HX-201').mission.tLaunch=-900;
+  newMission(o2,A('HX-202'));placeOnRoute(A('HX-202'),0.55);A('HX-202').fuel=62;A('HX-202').soc=86;A('HX-202').mission.tLaunch=-2900;
+  newMission(o3,A('HX-203'));placeOnRoute(A('HX-203'),0.6);A('HX-203').fuel=88;A('HX-203').soc=80;A('HX-203').mission.tLaunch=-1100;
+  A('HX-205').fuel=71;A('HX-205').soc=64;
+  S.orders.push({id:'O-1041',item:'Hip revision system',kg:26,from:'LOU',to:'POS',pri:'STAT',caseT:12900,status:'pending',created:-600},
+                {id:'O-1042',item:'Total knee system, size 5 + tray',kg:41,from:'LOU',to:'MUR',pri:'SCHED',caseT:22200,status:'pending',created:-1500},
+                {id:'O-1043',item:'Lumbar fusion implant set',kg:33,from:'LOU',to:'MDV',pri:'SCHED',caseT:27000,status:'pending',created:-2400});
+  spawnTraffic(true);
+  for(const ac of S.aircraft){ac.wref=null}
+  log('SYS','Shift start. 3 aircraft airborne, 3 on the ground. Base wind 235° at 11 kt; all fields VFR.');
+}
+
+/* ================= traffic ================= */
+function spawnTraffic(initial){
+  const kinds=[];
+  if(initial){
+    S.traffic.push({id:'N512MT',kind:'heli',coop:true,...xy(37.55,-86.6),alt:1000,vx:-0.035,vy:-0.012,label:'Air ambulance',ttl:4000});
+    S.traffic.push({id:'AG-UAS 7',kind:'uas',coop:true,...xy(37.66,-87.30),alt:350,vx:0,vy:0,orbit:{c:xy(37.66,-87.30),r:2.5,a:0},label:'Crop survey UAS',ttl:1e9});
+    S.traffic.push({id:'UTIL-UAS 3',kind:'uas',coop:true,...xy(37.25,-86.45),alt:300,vx:0.012,vy:0.004,label:'Line inspection UAS',ttl:6000});
+  }
+  const n=S.traffic.filter(t=>t.kind==='ga').length;
+  for(let i=n;i<3;i++){
+    const side=Math.floor(rnd()*4),b={x0:xy(36.5,-89.2).x,x1:xy(36.5,-85.3).x,y0:xy(36.5,0).y,y1:xy(38.45,0).y};
+    let x,y;if(side===0){x=b.x0;y=b.y0+rnd()*(b.y1-b.y0)}else if(side===1){x=b.x1;y=b.y0+rnd()*(b.y1-b.y0)}else if(side===2){y=b.y0;x=b.x0+rnd()*(b.x1-b.x0)}else{y=b.y1;x=b.x0+rnd()*(b.x1-b.x0)}
+    const tx=b.x0+rnd()*(b.x1-b.x0),ty=b.y0+rnd()*(b.y1-b.y0),L=Math.hypot(tx-x,ty-y),spd=(110+rnd()*60)*KT;
+    const reg='N'+Math.floor(100+rnd()*899)+'ABCDEFGHJKLMNPRSTUVWXYZ'[Math.floor(rnd()*23)]+'ABCDEFGHJKLMNPRSTUVWXYZ'[Math.floor(rnd()*23)];
+    S.traffic.push({id:reg,kind:'ga',coop:true,x,y,alt:3500+Math.floor(rnd()*7)*500,vx:(tx-x)/L*spd,vy:(ty-y)/L*spd,label:'GA aircraft',ttl:L/spd});
+  }
+}
+function stepTraffic(dt){
+  for(const t of S.traffic){
+    if(t.orbit){t.orbit.a+=dt*0.012;t.x=t.orbit.c.x+Math.cos(t.orbit.a)*t.orbit.r;t.y=t.orbit.c.y+Math.sin(t.orbit.a)*t.orbit.r;t.vx=-Math.sin(t.orbit.a)*0.03;t.vy=Math.cos(t.orbit.a)*0.03}
+    else{t.x+=t.vx*dt;t.y+=t.vy*dt}
+    t.ttl-=dt;
+  }
+  S.traffic=S.traffic.filter(t=>t.ttl>0);
+  if(S.traffic.filter(t=>t.kind==='ga').length<3&&rnd()<dt/300)spawnTraffic(false);
+  if(!S.traffic.find(t=>t.kind==='heli')&&rnd()<dt/1500){const a=TOWNS[Math.floor(rnd()*TOWNS.length)],b=TOWNS[Math.floor(rnd()*TOWNS.length)];if(a!==b){const L=dist(a,b),s=130*KT;S.traffic.push({id:'N'+Math.floor(200+rnd()*700)+'MT',kind:'heli',coop:true,x:a.x,y:a.y,alt:1000,vx:(b.x-a.x)/L*s,vy:(b.y-a.y)/L*s,label:'Air ambulance',ttl:L/s})}}
+}
+
+/* ================= wind ================= */
+function windAt(p,alt){
+  const bd=S.baseWind.dir*Math.PI/180,bs=S.baseWind.spd*(0.7+0.3*clamp(alt/2500,0,1))*KT;
+  let u=-Math.sin(bd)*bs,v=-Math.cos(bd)*bs;
+  for(const g of S.gusts){const d=dist(p,g);if(d<g.r){const k=(1-(d/g.r)**2)*clamp(alt/2500,0.35,1.1)*g.fade;const gd=g.dir*Math.PI/180,gs=g.spd*KT*k;u+=-Math.sin(gd)*gs;v+=-Math.cos(gd)*gs}}
+  return{u,v};
+}
+const windDirSpd=(u,v)=>({dir:((Math.atan2(-u,-v)*180/Math.PI)+360)%360,spd:Math.hypot(u,v)/KT});
+
+/* ================= flight dynamics ================= */
+function navigate(ac,dt,direct){
+  if(!ac.route.length)return;
+  const tgt=ac.route[Math.min(ac.wp,ac.route.length-1)];
+  const per={x:ac.x+ac.navBias.x,y:ac.y+ac.navBias.y};
+  let dx=tgt.x-per.x,dy=tgt.y-per.y,dd=Math.hypot(dx,dy);
+  if(dd<0.9&&ac.wp<ac.route.length-1&&!direct){ac.wp++;return navigate(ac,dt,direct)}
+  const tas=ac.tas*KT;const w=windAt(ac,ac.alt);
+  if(tas<0.0005){ // hover: station-keep, drift to pad
+    if(dd>0.002){const s=Math.min(dd,0.004*dt);ac.x+=dx/dd*s;ac.y+=dy/dd*s}
+    ac.gs=0;ac.airGround={ax:0,ay:0,gx:0,gy:0};return;
+  }
+  const ux=dx/(dd||1),uy=dy/(dd||1),nx=-uy,ny=ux;
+  let c=w.u*nx+w.v*ny;const al=w.u*ux+w.v*uy;c=clamp(c,-tas*0.9,tas*0.9);
+  const aAl=Math.sqrt(tas*tas-c*c);const ax=ux*aAl-nx*c,ay=uy*aAl-ny*c;
+  let gx=ax+w.u,gy=ay+w.v;
+  const step=Math.hypot(gx,gy)*dt;
+  if(ac.phase==='approach'&&step>dd){ac.x=tgt.x-ac.navBias.x;ac.y=tgt.y-ac.navBias.y}else{ac.x+=gx*dt;ac.y+=gy*dt}
+  ac.hdg=((Math.atan2(ax,ay)*180/Math.PI)+360)%360;ac.trk=((Math.atan2(gx,gy)*180/Math.PI)+360)%360;
+  ac.gs=Math.hypot(gx,gy)/KT;ac.airGround={ax,ay,gx,gy};
+}
+function altStep(ac,dt,rate){const tgt=targetAlt(ac);const d=tgt-ac.alt;const s=rate/60*dt;if(Math.abs(d)<=s){ac.vs=0;ac.alt=tgt}else{ac.vs=Math.sign(d)*rate;ac.alt+=Math.sign(d)*s}}
+function checkTOD(ac){const rem=remaining(ac);const need=((ac.alt-300)/700*60)*Math.max(ac.gs,50)*KT+2.6;if(rem<=need){ac.phase='descent'}}
+
+function stepAC(ac,dt){
+  ac.timer-=dt;let lift=0,cruise=0;
+  switch(ac.phase){
+    case 'parked': case 'unload':
+      ac.tas=0;ac.alt=0;ac.vs=0;ac.gs=0;ac.fuel=Math.min(100,ac.fuel+0.03*dt);ac.soc=Math.min(95,ac.soc+0.04*dt);
+      if(ac.phase==='unload'&&ac.timer<=0)finishUnload(ac);break;
+    case 'landed_off': ac.tas=0;ac.alt=0;ac.vs=0;ac.gs=0;break;
+    case 'preflight': if(ac.timer<=0){ac.phase='vtol_climb';ac.at=null;log('SYS',`${ac.id} lift-off from ${FAC[ac.mission.from].short}. Vertical climb, 8 lift motors.`)}break;
+    case 'vtol_climb': lift=1;ac.vs=500;ac.alt+=500/60*dt;if(ac.alt>=150){ac.phase='transition'}break;
+    case 'transition': lift=Math.max(0.05,1-ac.tas/ac.cruiseTAS);cruise=1.1*ac.tas/ac.cruiseTAS+0.3;ac.tas=Math.min(ac.cruiseTAS,ac.tas+ac.cruiseTAS/25*dt);ac.vs=300;ac.alt+=300/60*dt;navigate(ac,dt);if(ac.tas>=ac.cruiseTAS){ac.phase='climb'}break;
+    case 'climb': cruise=1.15;ac.tas=ac.cruiseTAS;{const tg=targetAlt(ac);ac.vs=900;ac.alt+=900/60*dt;if(ac.alt>=tg){ac.alt=tg;ac.vs=0;ac.phase='cruise'}}navigate(ac,dt);checkTOD(ac);break;
+    case 'cruise': cruise=1;ac.tas+= (ac.cruiseTAS-ac.tas)*Math.min(1,dt/10);altStep(ac,dt,700);navigate(ac,dt);checkTOD(ac);break;
+    case 'hold': {cruise=0.9;ac.tas=Math.min(ac.cruiseTAS,90);const h=ac.hold;const R=2.2;h.a-=ac.tas*KT/R*dt;ac.x=h.c.x+Math.cos(h.a)*R;ac.y=h.c.y+Math.sin(h.a)*R;ac.hdg=ac.trk=((-h.a*180/Math.PI)+180+360)%360;ac.gs=ac.tas;altStep(ac,dt,700);break}
+    case 'descent': cruise=0.55;ac.tas+=(ac.cruiseTAS-ac.tas)*Math.min(1,dt/10);ac.vs=-700;ac.alt=Math.max(300,ac.alt-700/60*dt);navigate(ac,dt);{const end=ac.route[ac.route.length-1];if(dist(ac,end)<2.2&&ac.wp>=ac.route.length-1)ac.phase='approach'}break;
+    case 'approach': {const end=ac.route[ac.route.length-1];ac.wp=ac.route.length-1;const d=dist({x:ac.x+ac.navBias.x,y:ac.y+ac.navBias.y},end);ac.tas=d>0.15?Math.max(18,ac.cruiseTAS*Math.min(1,d/2.2)**1.3):0;lift=Math.min(1,1-ac.tas/ac.cruiseTAS+0.1);cruise=0.6*ac.tas/ac.cruiseTAS;{const r=ac.alt>700?900:400;ac.vs=ac.alt>200?-r:0;ac.alt=Math.max(200,ac.alt-r/60*dt)}navigate(ac,dt,true);if(d<0.03){ac.phase='vtol_land';ac.tas=0}break}
+    case 'vtol_land': {lift=1;ac.tas=0;ac.gs=0;navigate(ac,dt,true);const r=ac.alt>300?700:(ac.alt>60?380:160);ac.vs=-r;ac.alt-=r/60*dt;if(ac.alt<=0){ac.alt=0;ac.vs=0;touchdown(ac)}break}
+  }
+  power(ac,dt,lift,cruise);motorsStep(ac,dt,lift,cruise);fdi(ac,dt);vv(ac,dt);windEst(ac,dt);udc(ac,dt);
+  if(airborne(ac)){ac.trailT+=dt;if(ac.trailT>20){ac.trailT=0;ac.trail.push({x:ac.x,y:ac.y});if(ac.trail.length>200)ac.trail.shift()}}
+}
+function power(ac,dt,lift,cruise){
+  if(!airborne(ac)&&ac.phase!=='preflight'){ac.genKw=0;ac.demand=0;ac.battKw=0;ac.busV=700+0.9*ac.soc;ac.cur=0;return}
+  const demand=ac.phase==='preflight'?6:320*lift+92*cruise+4;
+  let gen=0;if(ac.genOK&&ac.fuel>0&&ac.phase!=='preflight'){gen=Math.min(130,demand+(ac.soc<88?28:0))}
+  const batt=demand-gen;
+  ac.soc=clamp(ac.soc-batt*dt/1440,0,100);ac.fuel=clamp(ac.fuel-gen*dt*0.000115,0,100);
+  ac.genKw=gen;ac.demand=demand;ac.battKw=batt;ac.busV=clamp(690+0.9*ac.soc-0.12*Math.max(0,batt),560,800);ac.cur=demand*1000/ac.busV;
+}
+function motorsStep(ac,dt,lift,cruise){
+  const M=ac.motors;const liftUp=M.slice(0,8).filter(m=>!m.failed).length||1;const known=M.slice(0,8).filter(m=>!(m.failed&&m.flagged)).length||1;
+  let der=0;for(let i=8;i<12;i++)der+=M[i].failed?0:(M[i].isolated?0.6:1);der=der||1;
+  const k=1-Math.exp(-dt/40),kf=1-Math.exp(-dt/3);
+  M.forEach((m,i)=>{
+    let cmd;if(i<8){cmd=m.failed?0:lift*8/liftUp;m.pred=(m.failed&&m.flagged)?0:lift*8/known*118}
+    else{const share=cruise*4/der*(m.failed?0:(m.isolated?0.6:1));cmd=share;m.pred=share*62}
+    const nom=i<8?cmd*118:cmd*62;
+    m.cur=m.failed?0:Math.max(0,nom*(1+m.deg)+(nom>1?gauss()*nom*0.012:0));
+    const base=i<8?118:62,kh=i<8?70:50;
+    const teq=18+kh*(m.cur/base)**2+(m.cur>1?m.deg*130:0),tpe=18+kh*(m.pred/base)**2;
+    m.temp+=(teq-m.temp)*k;m.tpred+=(tpe-m.tpred)*k;
+    const r=m.pred>4?(m.cur-m.pred)/Math.max(m.pred,10):0;m.rf+=(r-m.rf)*kf;
+  });
+}
+function fdi(ac,dt){
+  if(!airborne(ac))return;
+  ac.motors.forEach((m,i)=>{
+    if(m.failed&&!m.flagged){m.bit-=dt;if(m.bit<=0){m.flagged=true;m.isolated=true;S.kpi.events++;liftFailure(ac,m)}return}
+    if(m.isolated)return;
+    const tres=m.temp-m.tpred;
+    if(Math.abs(m.rf)>0.12||tres>12){m.susp+=dt}else m.susp=Math.max(0,m.susp-dt);
+    if(m.susp>4){m.isolated=true;S.kpi.events++;
+      ac.cruiseTAS=102;ac.maint.push(m.name+' bearing / winding inspection');
+      raise({sev:'warning',mod:'FDI',ac:ac.id,title:`${ac.id} · Cruise motor ${m.name} degraded`,body:`Current ${m.rf>0?'+':''}${(m.rf*100).toFixed(0)}% and winding temperature +${tres.toFixed(0)} °C above the model. ${m.name} isolated and derated to 60%; thrust redistributed to the other cruise motors. Cruise speed 110 → 102 kt. Lift system unaffected.`,options:[{label:'Acknowledge',act:'ack',rec:true}]});
+      log('FDI',`${ac.id}: ${m.name} fault detected (residual ${(m.rf*100).toFixed(0)}%, ΔT +${tres.toFixed(0)} °C). Isolated, derated 60%, thrust redistributed. Maintenance flag raised.`,'warning');
+    }
+  });
+  if(ac.genFail&&!ac.genFlag){ac.genFlagT=(ac.genFlagT||0)+dt;if(ac.genFlagT>2){ac.genFlag=true;S.kpi.events++;genFailure(ac)}}
+}
+function liftFailure(ac,m){
+  log('FDI',`${ac.id}: lift motor ${m.name} failed controller self-test (no back-EMF). 7 of 8 lift motors available, hover margin 18%.`,'warning');
+  const near=nearestFacility(ac,ac.mission?ac.mission.to:null);
+  raise({sev:'warning',mod:'FDI',ac:ac.id,title:`${ac.id} · Lift motor ${m.name} failed`,body:`Detected by the motor-controller self-test while in cruise. ${m.name} is isolated; the remaining 7 lift motors will carry the vertical landing with 18% hover margin, inside limits. Recommendation: continue to destination.`,
+    options:[{label:'Continue to destination',act:'continue',rec:true},{label:`Divert to ${near.short} (${(dist(ac,near)/NM).toFixed(0)} nm)`,act:'divert:'+near.id}]});
+}
+function genFailure(ac){
+  const reach=reachKm(ac);ac.els=computeELS(ac,Math.min(reach,45));
+  const facs=Object.values(FAC).filter(f=>f.type!=='hub'||true).map(f=>({f,d:dist(ac,f)})).filter(o=>o.d<reach*0.85).sort((a,b)=>a.d-b.d);
+  const opts=[];const best=ac.els[0];
+  if(facs.length){opts.push({label:`Divert to ${facs[0].f.short} (${(facs[0].d/NM).toFixed(0)} nm)`,act:'divert:'+facs[0].f.id,rec:true});if(best)opts.push({label:`Emergency landing at ${best.name}`,act:'els'})}
+  else{if(best)opts.push({label:`Emergency landing at ${best.name} (${(dist(ac,best)/NM).toFixed(1)} nm)`,act:'els',rec:true});opts.push({label:'Hold and troubleshoot',act:'hold'})}
+  log('FDI',`${ac.id}: turbine-generator output lost. Battery-only flight, SOC ${ac.soc.toFixed(0)}%. Estimated reach ${(reach/NM).toFixed(0)} nm with landing reserve.`,'critical');
+  log('ELS',`${ac.id}: ${ac.els.length} candidate landing sites ranked by population exposure, distance and surface. Best: ${best?best.name+' · score '+best.score.toFixed(2):'none'}.`,'critical');
+  raise({sev:'critical',mod:'FDI',ac:ac.id,title:`${ac.id} · Generator failure, battery only`,body:`Reach about ${(reach/NM).toFixed(0)} nm keeping 22% for the vertical landing. ${facs.length?`${facs[0].f.name} is inside reach and has a certified pad.`:'No certified pad inside reach; the emergency-landing planner has ranked open sites (green rings on the map).'}`,options:opts,decision:true});
+}
+function reachKm(ac){const rate=(92+4)/1440;return Math.max(0,(ac.soc-22)/rate)*Math.max(ac.gs,60)*KT}
+function nearestFacility(ac,exclude){let best=null,bd=1e9;for(const k in FAC){if(k===exclude)continue;const d=dist(ac,FAC[k]);if(d<bd){bd=d;best=FAC[k]}}return best}
+
+function riverDist(p){let m=1e9;for(const k in RIVERS){const r=RIVERS[k];for(let i=1;i<r.length;i++)m=Math.min(m,projSeg(p,r[i-1],r[i]).d)}for(const l of LAKES)for(let i=1;i<l.length;i++)m=Math.min(m,projSeg(p,l[i-1],l[i]).d-1.5);return m}
+function surface(p){const h=Math.abs(Math.sin(p.x*12.9898+p.y*78.233)*43758.5453)%1;if(h<0.28)return['Woodland',0.2];if(h<0.6)return['Cropland',0.8];if(h<0.9)return['Pasture',0.95];return['Open field',0.9]}
+function computeELS(ac,R){
+  R=Math.max(R,6);const c=[];
+  for(let dx=-R;dx<=R;dx+=2.2)for(let dy=-R;dy<=R;dy+=2.2){
+    const p={x:ac.x+dx,y:ac.y+dy};const d=Math.hypot(dx,dy);if(d>R||d<1.5)continue;
+    let tEdge=1e9;for(const t of TOWNS)tEdge=Math.min(tEdge,dist(p,t)-t.r);if(tEdge<1.2)continue;
+    if(riverDist(p)<1.0)continue;if(RESTRICTED.some(r=>dist(p,r)<r.r)||S.tfrs.some(r=>dist(p,r)<r.r))continue;
+    const [sname,sv]=surface(p);if(sv<0.5)continue;
+    const pop=Math.min(1,tEdge/14);const score=0.45*pop+0.35*clamp(1-Math.abs(d-8)/R,0,1)+0.2*sv;c.push({x:p.x,y:p.y,score,surface:sname,pop,d});
+  }
+  c.sort((a,b)=>b.score-a.score);const out=[];for(const s of c){if(out.every(o=>dist(o,s)>6))out.push(s);if(out.length===3)break}
+  out.forEach((s,i)=>s.name=`ELS-${i+1} · ${s.surface}`);return out;
+}
+
+function vv(ac,dt){
+  if(!airborne(ac)){ac.xte=0;return}
+  if(ac.gnss&&ac.navMode==='GNSS + INS'){const tr=ac.trk*Math.PI/180;ac.navBias.x+=Math.cos(tr)*0.0032*dt;ac.navBias.y+=-Math.sin(tr)*0.0032*dt}
+  else{const k=Math.exp(-dt/25);ac.navBias.x*=k;ac.navBias.y*=k}
+  const div=Math.hypot(ac.navBias.x,ac.navBias.y)*1000;
+  if(div>120&&ac.navMode==='GNSS + INS'){ac.navSusp+=dt;if(ac.navSusp>3){ac.navMode='INS + VISION';S.kpi.events++;
+    raise({sev:'warning',mod:'VV',ac:ac.id,title:`${ac.id} · Navigation integrity monitor tripped`,body:`GPS position diverged ${div.toFixed(0)} m from the inertial and visual-odometry solution, which points to drift or spoofing. GPS excluded; navigating on INS + vision. The aircraft is steering back to the planned track. The trajectory was still inside the 300 m conformance bound.`,options:[{label:'Acknowledge',act:'ack',rec:true}]});
+    log('VV',`${ac.id}: GNSS vs INS divergence ${div.toFixed(0)} m > 120 m. GNSS excluded, nav source INS + VISION. Track recovery in progress.`,'warning')}}
+  if(ac.wp>0&&ac.wp<ac.route.length&&['cruise','climb','descent','transition'].includes(ac.phase)){let p=projSeg(ac,ac.route[ac.wp-1],ac.route[ac.wp]);if(ac.wp>1){const q=projSeg(ac,ac.route[ac.wp-2],ac.route[ac.wp-1]);if(q.d<p.d)p=q}ac.xte=p.d*p.side*1000}else ac.xte*=0.9;
+  ac.histT+=dt;if(ac.histT>=4){ac.histT=0;const best=ac.motors.reduce((m,x)=>Math.max(m,x.isolated&&!x.failed?0:Math.abs(x.rf)),0);ac.hist.push({t:S.t,xte:ac.xte,div,alt:ac.alt,soc:ac.soc,fuel:ac.fuel,res:best,temp:Math.max(...ac.motors.map(m=>m.temp))});if(ac.hist.length>160)ac.hist.shift()}
+}
+function windEst(ac,dt){
+  if(!airborne(ac)||ac.tas<20)return;
+  const g=ac.airGround;const mu=g.gx-g.ax+gauss()*0.4*KT,mv=g.gy-g.ay+gauss()*0.4*KT;
+  const k=1-Math.exp(-dt/6);ac.west.u+=(mu-ac.west.u)*k;ac.west.v+=(mv-ac.west.v)*k;
+  if(!ac.wref){ac.wref={u:ac.west.u,v:ac.west.v};return}
+  const kr=1-Math.exp(-dt/400);
+  const dU=ac.west.u-ac.wref.u,dV=ac.west.v-ac.wref.v,dmag=Math.hypot(dU,dV)/KT;
+  if(dmag>14&&S.t>ac.wflag){
+    ac.wflag=S.t+900;const e=windDirSpd(ac.west.u,ac.west.v);
+    const trk=ac.trk*Math.PI/180;const head=-(ac.west.u*Math.sin(trk)+ac.west.v*Math.cos(trk))/KT;
+    let act='';const inG=S.gusts.some(gu=>dist(ac,gu)<gu.r);
+    if(inG&&targetAlt(ac)>1600&&head>8){const old=targetAlt(ac);ac.windAdj=-(old-1500);act=` Wind is lighter lower down; UTM approved a descent from ${fmtInt(old)} to 1,500 ft.`;}
+    S.kpi.events++;
+    log('WIND',`${ac.id}: estimated wind ${e.dir.toFixed(0)}° / ${e.spd.toFixed(0)} kt (Δ ${dmag.toFixed(0)} kt), ${head>0?'headwind':'tailwind'} ${Math.abs(head).toFixed(0)} kt. Groundspeed ${ac.gs.toFixed(0)} kt; ETA re-planned.${act}`,'warning');
+    raise({sev:'info',mod:'WIND',ac:ac.id,title:`${ac.id} · Wind shift detected`,body:`Estimated from the aircraft's own motion: ${e.dir.toFixed(0)}° at ${e.spd.toFixed(0)} kt, ${Math.abs(head).toFixed(0)} kt ${head>0?'headwind':'tailwind'}. ETA and fuel at arrival re-planned.${act}`,options:[{label:'Acknowledge',act:'ack',rec:true}]});
+  }
+  ac.wref.u+=(ac.west.u-ac.wref.u)*kr;ac.wref.v+=(ac.west.v-ac.wref.v)*kr;
+  if(ac.windAdj&&!S.gusts.some(gu=>dist(ac,gu)<gu.r+5)){ac.windAdj=0;log('WIND',`${ac.id}: clear of gust front, returning to assigned altitude ${fmtInt(targetAlt(ac))} ft.`)}
+}
+function udc(ac,dt){
+  if(ac.linkRestore&&S.t>ac.linkRestore){ac.linkRestore=0;ac.link.lte=true;log('UDC',`${ac.id}: LTE C2 link restored. Primary source back to LTE, SATCOM on standby.`)}
+}
+function streamSrc(ac){return ac.link.lte?'LTE':(ac.link.sat?'SATCOM':'NONE')}
+function latency(ac){return ac.link.lte?42+Math.floor(rnd()*25):(ac.link.sat?780+Math.floor(rnd()*260):0)}
+
+function touchdown(ac){
+  const m=ac.mission;
+  if(ac.emergency){ac.phase='landed_off';log('ELS',`${ac.id} landed at ${ac.emergencySite||'emergency site'}. Recovery crew dispatched; payload ${m?'handed to ground courier':'secured'}.`,'warning');
+    if(m&&m.kind==='delivery'){m.status='diverted';const o={id:'O-'+(S.nextO++),item:m.item+' (re-fly)',kg:m.kg,from:'LOU',to:m.to,pri:'STAT',caseT:m.caseT,status:'pending',created:S.t};S.orders.unshift(o);log('DISPATCH',`Re-fly order ${o.id} created for ${FAC[m.to].short} from LOU HUB.`)}
+    ac.mission=null;ac.route=[];return}
+  const dest=ac.divertTo||(m&&m.to)||ac.home;ac.at=dest;const f=FAC[dest];ac.x=f.x;ac.y=f.y;ac.navBias={x:0,y:0};
+  if(m){
+    if(!ac.divertTo&&m.kind==='delivery'){
+      m.status='delivered';S.kpi.delivered++;const late=m.caseT!=null&&S.t>m.caseT-1800;if(!late)S.kpi.onTime++;if(m.pri==='STAT'&&!late)S.kpi.protected++;
+      const air=S.t-m.tLaunch;const gm=groundMin(FAC[m.from],FAC[m.to])*60;S.kpi.saved+=Math.max(0,gm-air);
+      log('DISPATCH',`${ac.id} delivered ${m.order.id} to ${f.name} at ${fmtClock(S.t,f.tz,false)} ${tzName(f.tz)}${m.caseT!=null?`, ${fmtDur(m.caseT-S.t)} before the case`:''}. Ground courier would have taken ${fmtDur(gm)}.`);
+    }else if(ac.divertTo){m.status='diverted';log('DISPATCH',`${ac.id} landed at ${f.name} (diversion). Payload handed to ground courier for the last leg.`,'warning')}
+    else{m.status='complete';log('DISPATCH',`${ac.id} arrived ${f.short} with ${m.item.toLowerCase()}.`)}
+    m.order.status=m.status;
+  }
+  ac.divertTo=null;ac.phase='unload';ac.timer=m&&m.kind==='return'?120:240;ac.route=[];ac.wp=0;ac.utmOff=0;ac.windAdj=0;
+}
+function finishUnload(ac){
+  const m=ac.mission;ac.mission=null;
+  if(ac.at!==ac.home&&!ac.motors.some(x=>x.isolated)&&ac.genOK){
+    const o={id:'R-'+(S.nextM),item:'Empty pods / loaner trays',kg:12,from:ac.at,to:ac.home,pri:'RETURN',caseT:null,status:'pending',created:S.t};
+    newMission(o,ac);ac.phase='preflight';ac.timer=60;log('DISPATCH',`${ac.id} returning to ${FAC[ac.home].short} with empty pods.`)
+  }else{ac.phase='parked';if(ac.motors.some(x=>x.isolated)||!ac.genOK)log('SYS',`${ac.id} grounded at ${FAC[ac.at].short} for maintenance: ${ac.maint.join('; ')||'powertrain inspection'}.`)}
+}
+
+/* ================= UTM ================= */
+function utm(){
+  const conf=[];const helix=S.aircraft.filter(a=>airborne(a)&&a.phase!=='vtol_climb'&&a.phase!=='vtol_land');
+  const vel=o=>o.vx!==undefined?{x:o.vx,y:o.vy}:{x:o.airGround.gx,y:o.airGround.gy};
+  const others=[...helix,...S.traffic];
+  for(const a of helix){for(const b of others){if(a===b)continue;if(helix.includes(b)&&b.id<a.id)continue;
+    const dp={x:b.x-a.x,y:b.y-a.y},va=vel(a),vb=vel(b),dv={x:vb.x-va.x,y:vb.y-va.y};const dv2=dv.x*dv.x+dv.y*dv.y;
+    let tc=dv2>1e-9?-(dp.x*dv.x+dp.y*dv.y)/dv2:0;tc=clamp(tc,0,180);
+    const dm=Math.hypot(dp.x+dv.x*tc,dp.y+dv.y*tc);const now=Math.hypot(dp.x,dp.y);
+    const bAlt=b.alt,va2=Math.abs(targetAlt(a)-(b.cruiseAlt!==undefined?targetAlt(b):bAlt)),vNow=Math.abs(a.alt-bAlt);
+    if(dm<1.85&&now<25&&Math.min(va2,vNow)<450){conf.push({a,b,tc,dm,cpa:{x:a.x+va.x*tc,y:a.y+va.y*tc},resolved:va2>=450})}
+  }}
+  S.conflicts=conf;
+  for(const c of conf){
+    let mover=c.a,other=c.b;
+    if(c.b.cruiseAlt!==undefined){const pr=x=>x.mission?({STAT:3,SCHED:2,RETURN:1}[x.mission.pri]||0):0;if(pr(c.a)>pr(c.b)||(pr(c.a)===pr(c.b)&&c.a.id<c.b.id)){mover=c.b;other=c.a}}
+    if(mover.utmRes)continue;
+    const oAlt=other.cruiseAlt!==undefined?targetAlt(other):other.alt;
+    let d=oAlt>=mover.alt?-500:500;if(targetAlt(mover)+d<1000)d=500;
+    const busy=dd=>S.aircraft.some(x=>x!==mover&&x!==other&&airborne(x)&&dist(x,mover)<30&&Math.abs(targetAlt(x)-(targetAlt(mover)+dd))<450);if(busy(d)&&!busy(-d))d=-d;
+    mover.utmOff+=d;mover.utmRes={with:other.id,since:S.t};S.kpi.conflicts++;S.kpi.events++;
+    const kind=other.coop===false?'non-cooperative, primary radar track':(other.cruiseAlt!==undefined?'Helix':other.label+', ADS-B');
+    log('UTM',`Predicted loss of separation ${mover.id} vs ${other.id} (${kind}): closest approach ${(c.dm/NM).toFixed(2)} nm in ${fmtMS(c.tc)}. Resolution: ${mover.id} ${d<0?'descend':'climb'} to ${fmtInt(targetAlt(mover))} ft.`,'warning');
+    raise({sev:other.coop===false?'warning':'info',mod:'UTM',ac:mover.id,title:`${mover.id} · Traffic conflict resolved`,body:`${other.id} (${kind}) projected within ${(c.dm/NM).toFixed(2)} nm in ${fmtMS(c.tc)}. UTM issued ${d<0?'a descent':'a climb'} to ${fmtInt(targetAlt(mover))} ft; 500 ft vertical separation restored before closest approach.`,options:[{label:'Acknowledge',act:'ack',rec:true}]});
+  }
+  for(const a of S.aircraft){if(!a.utmRes)continue;const o=S.aircraft.find(x=>x.id===a.utmRes.with)||S.traffic.find(x=>x.id===a.utmRes.with);
+    let clear=!o||!airborne(a);if(o&&!clear){const vo=vel(o),va=vel(a);const dp={x:o.x-a.x,y:o.y-a.y},dv={x:vo.x-va.x,y:vo.y-va.y};const opening=dp.x*dv.x+dp.y*dv.y>0;clear=opening&&Math.hypot(dp.x,dp.y)>4&&S.t-a.utmRes.since>60}
+    if(clear){a.utmRes=null;a.utmOff=0;if(airborne(a))log('UTM',`${a.id} clear of traffic, returning to ${fmtInt(targetAlt(a))} ft.`)}}
+  S.tfrs=S.tfrs.filter(t=>{if(S.t>t.until){log('UTM',`${t.id} expired. Airspace released.`);return false}return true});
+  S.gusts.forEach(g=>{g.x+=g.vx*1;g.y+=g.vy*1;if(S.t>g.until)g.fade=Math.max(0,g.fade-0.004)});S.gusts=S.gusts.filter(g=>g.fade>0);
+}
+
+/* ================= alerts & decisions ================= */
+let alertId=1;
+function raise(a){
+  a.id=alertId++;a.created=performance.now();a.deadline=a.decision?15000:12000;
+  S.alerts.push(a);if(S.alerts.length>4)S.alerts.shift();
+  if(a.decision&&!S.forcedSlow){S.forcedSlow=S.speed;setSpeed(1,true);log('SYS',`Simulation slowed to 1× pending operator decision.`)}
+  renderAlerts(true);
+}
+function resolveAlert(id,act){
+  const a=S.alerts.find(x=>x.id===id);if(!a)return;S.alerts=S.alerts.filter(x=>x.id!==id);
+  const ac=S.aircraft.find(x=>x.id===a.ac);
+  if(act&&act!=='ack'&&ac)doAction(ac,act,true);
+  if(a.decision&&!S.alerts.some(x=>x.decision)&&S.forcedSlow){setSpeed(S.forcedSlow,true);S.forcedSlow=null}
+  renderAlerts(true);
+}
+function doAction(ac,act,fromAlert){
+  const [cmd,arg]=act.split(':');
+  if(cmd==='continue'){log('SYS',`Operator: ${ac.id} continue to ${ac.mission?FAC[ac.mission.to].short:'destination'}.`);return}
+  if(cmd==='hold'){if(!airborne(ac)||['vtol_climb','vtol_land','approach'].includes(ac.phase))return;const tr=ac.trk*Math.PI/180;const R=2.2;const c={x:ac.x+Math.cos(tr)*R,y:ac.y-Math.sin(tr)*R};ac.hold={c,a:Math.atan2(ac.y-c.y,ac.x-c.x),prev:ac.phase};ac.phase='hold';log('SYS',`Operator: ${ac.id} holding (right-hand orbit) at ${fmtInt(targetAlt(ac))} ft.`);return}
+  if(cmd==='resume'){if(ac.phase!=='hold')return;ac.phase='cruise';ac.hold=null;ac.route=[{x:ac.x,y:ac.y},...ac.route.slice(ac.wp)];ac.wp=1;log('SYS',`Operator: ${ac.id} resuming flight plan.`);return}
+  if(cmd==='alt'){const d=+arg;if(!airborne(ac))return;const nt=targetAlt(ac)+d;if(nt<1000||nt>4000){log('UTM',`${ac.id}: altitude request ${fmtInt(nt)} ft denied (outside the 1,000–4,000 ft operating band).`,'warning');return}ac.cruiseAlt+=d;log('UTM',`${ac.id}: altitude change to ${fmtInt(targetAlt(ac))} ft requested and approved.`);return}
+  if(cmd==='divert'){const f=FAC[arg];if(!f||!airborne(ac))return;if(ac.phase==='hold'){ac.phase='cruise';ac.hold=null}ac.divertTo=arg;ac.route=planRoute(ac,f);ac.wp=1;ac.emergency=false;ac.els=null;if(['descent','approach'].includes(ac.phase))ac.phase='cruise';log('SYS',`Operator: ${ac.id} diverting to ${f.name}, ${(routeLen(ac.route)/NM).toFixed(0)} nm.`,'warning');return}
+  if(cmd==='rtb'){doAction(ac,'divert:'+ac.home);return}
+  if(cmd==='els'){if(!airborne(ac))return;if(!ac.els||!ac.els.length)ac.els=computeELS(ac,Math.min(reachKm(ac),30));const s=ac.els[0];if(!s)return;if(ac.phase==='hold'){ac.phase='cruise';ac.hold=null}ac.emergency=true;ac.emergencySite=s.name;ac.route=[{x:ac.x,y:ac.y},{x:s.x,y:s.y}];ac.wp=1;if(['vtol_climb','transition'].includes(ac.phase))ac.phase='climb';if(ac.phase==='climb')ac.phase='cruise';
+    log('ELS',`${ac.id}: emergency landing at ${s.name}, ${(dist(ac,s)/NM).toFixed(1)} nm. Population-exposure score ${s.pop.toFixed(2)}. UTM broadcasting emergency volume.`,'critical');return}
+  if(cmd==='elsplan'){if(!airborne(ac))return;ac.els=computeELS(ac,Math.min(reachKm(ac),30));const s=ac.els[0];raise({sev:'critical',mod:'ELS',ac:ac.id,title:`${ac.id} · Emergency landing requested`,body:`Ranked sites are shown as green rings. Best: ${s?s.name+', '+(dist(ac,s)/NM).toFixed(1)+' nm, score '+s.score.toFixed(2):'none in reach'}. Confirm to land there now.`,options:[{label:'Land at '+(s?s.name:'site'),act:'els',rec:true},{label:'Cancel',act:'cancelels'}],decision:true});return}
+  if(cmd==='cancelels'){ac.els=null;return}
+}
+
+/* ================= event injection ================= */
+const EVENTS=[
+  {id:'intruder',mod:'UTM',name:'Intruder aircraft',desc:'A low-flying aircraft without a transponder crosses the route at the same altitude.'},
+  {id:'tfr',mod:'UTM',name:'Pop-up flight restriction',desc:'An emergency TFR closes airspace ahead. UTM reroutes every affected flight.'},
+  {id:'gust',mod:'WIND',name:'Gust front',desc:'A 35 kt wind shift moves across the route. The aircraft estimates it from its own motion.'},
+  {id:'cruisemotor',mod:'FDI',name:'Cruise motor wear',desc:'Bearing wear on cruise motor C2 raises current and heat. FDI isolates and derates it.'},
+  {id:'liftmotor',mod:'FDI',name:'Lift motor failure',desc:'Lift motor L6 fails its self-test. Decide whether to continue on 7 of 8.'},
+  {id:'generator',mod:'ELS',name:'Generator failure',desc:'The turbine-generator quits. Battery-only reach decides: divert or emergency landing.'},
+  {id:'gnss',mod:'VV',name:'GPS drift / spoofing',desc:'The GPS solution slowly walks off. Runtime V&V catches the divergence and switches navigation source.'},
+  {id:'link',mod:'UDC',name:'C2 link loss',desc:'The LTE command link drops for 5 minutes. The data compiler fails over to SATCOM.'},
+  {id:'fog',mod:'VBL',name:'Fog at destination',desc:'Visibility drops to ¼ mile at the destination pad. The camera guides the landing.'},
+];
+function inject(kind,acId){
+  const ac=S.aircraft.find(a=>a.id===acId);
+  const need=['intruder','tfr','gust','cruisemotor','liftmotor','generator','gnss','link'];
+  if(need.includes(kind)&&(!ac||!airborne(ac))){log('SYS',`Choose an airborne aircraft for that event.`,'warning');return false}
+  const ahead=d=>{const rest=[{x:ac.x,y:ac.y},...ac.route.slice(ac.wp)];const L=routeLen(rest);return pointAlong(rest,Math.min(d,Math.max(0,L-8)))};
+  switch(kind){
+    case 'intruder':{const tc=150,gsk=Math.max(ac.gs,60)*KT;const P=ahead(gsk*tc+0.45);const tr=ac.trk*Math.PI/180;const side=rnd()<0.5?1:-1;const nx=Math.cos(tr)*side,ny=-Math.sin(tr)*side;const sp=115*KT;
+      const t={id:'N'+Math.floor(1000+rnd()*8999).toString().slice(0,4)+'K',kind:'intruder',coop:false,x:P.x+nx*sp*tc,y:P.y+ny*sp*tc,alt:Math.round(ac.alt/100)*100,vx:-nx*sp,vy:-ny*sp,label:'Unidentified (no transponder)',ttl:tc*2.5};
+      S.traffic.push(t);log('UTM',`Primary radar: non-cooperative target ${t.id} at ${fmtInt(t.alt)} ft, converging on ${ac.id}'s route.`);break}
+    case 'tfr':{const P=ahead(32);const t={id:'TFR '+(4100+S.nextT++)+' (emergency response)',x:P.x,y:P.y,r:9,until:S.t+2400};S.tfrs.push(t);
+      for(const a of S.aircraft){if(!airborne(a)||!a.route.length||a.emergency)continue;const rest=[{x:a.x,y:a.y},...a.route.slice(a.wp)];if(rest.some((p,i)=>i>0&&projSeg(t,rest[i-1],p).d<t.r)){const end=rest[rest.length-1];const old=routeLen(rest);if(a.phase==='hold'){a.phase='cruise';a.hold=null}a.route=planRoute(a,end);a.wp=1;S.kpi.events++;
+        log('UTM',`${t.id}: 5 nm radius, surface to 3,000 ft. ${a.id} rerouted, +${((routeLen(a.route)-old)/NM).toFixed(1)} nm, ETA +${fmtMS((routeLen(a.route)-old)/(Math.max(a.gs,60)*KT))}.`,'warning')}}
+      raise({sev:'info',mod:'UTM',ac:ac.id,title:'Pop-up flight restriction',body:`${t.id} activated on the corridor. Affected Helix flights were rerouted automatically and the new operation volumes approved.`,options:[{label:'Acknowledge',act:'ack',rec:true}]});break}
+    case 'gust':{const P=ahead(30);const tr=ac.trk*Math.PI/180;S.gusts.push({x:P.x-Math.sin(tr)*6,y:P.y-Math.cos(tr)*6,r:38,dir:(ac.trk+30)%360,spd:34,vx:-Math.sin(tr)*0.004,vy:-Math.cos(tr)*0.004,until:S.t+1800,fade:1});
+      log('SYS',`Weather: gust front developing on the ${FAC[ac.mission.to].short} corridor (not yet sensed by aircraft).`);break}
+    case 'cruisemotor':ac.motors[9].deg=0.24;break;
+    case 'liftmotor':ac.motors[5].failed=true;ac.motors[5].bit=3;break;
+    case 'generator':ac.genOK=false;ac.genFail=true;ac.genFlag=false;ac.genFlagT=0;break;
+    case 'gnss':ac.gnss=true;ac.navMode='GNSS + INS';ac.navSusp=0;break;
+    case 'link':ac.link.lte=false;ac.linkRestore=S.t+300;S.kpi.events++;log('UDC',`${ac.id}: primary C2 (LTE) lost. Fused stream failed over to SATCOM in 1.2 s; ADS-B and Remote ID unaffected. Lost-link procedure not required.`,'warning');
+      raise({sev:'info',mod:'UDC',ac:ac.id,title:`${ac.id} · Command link failover`,body:'LTE dropped. The data compiler switched the unified telemetry and command stream to SATCOM (latency ~900 ms, 1 Hz). Mission continues; LTE retry every 30 s.',options:[{label:'Acknowledge',act:'ack',rec:true}]});break;
+    case 'fog':{let f;if(ac&&ac.mission)f=FAC[ac.divertTo||ac.mission.to];else f=FAC.PRH;f.wx.fog=true;f.wx.vis=0.25;f.wx.ceil=200;f.wx.until=S.t+3600;S.kpi.events++;
+      log('VBL',`${f.short}: visibility ¼ SM, fog, ceiling 200 ft. GPS approach degraded by multipath; vision-based landing armed for inbound aircraft.`,'warning');break}
+  }
+  return true;
+}
+
+/* ================= orders ================= */
+function eligible(o){return S.aircraft.filter(a=>a.phase==='parked'&&a.at===o.from&&!a.mission&&a.fuel>35&&a.genOK&&!a.motors.some(m=>m.isolated)&&o.kg<=227)}
+function autoOrders(){
+  if(S.t-S.lastOrderT>2100+rnd()*900){S.lastOrderT=S.t;const [item,kg]=ITEMS[Math.floor(rnd()*ITEMS.length)];const dests=['PRH','POS','OWB','MDV','MUR','BWG','ETN'];const to=dests[Math.floor(rnd()*dests.length)];const pri=rnd()<0.4?'STAT':'SCHED';
+    const o={id:'O-'+(S.nextO++),item,kg,from:'LOU',to,pri,caseT:S.t+(pri==='STAT'?9000+rnd()*3600:18000+rnd()*14400),status:'pending',created:S.t};S.orders.unshift(o);log('DISPATCH',`New ${pri==='STAT'?'STAT ':''}request ${o.id}: ${item} for ${FAC[to].name}.`)}
+}
+
+/* ================= main loop ================= */
+let lastT=performance.now();
+function tick(now){
+  const realDt=Math.min(0.1,(now-lastT)/1000);lastT=now;
+  if(!S.paused){let simDt=realDt*S.speed;while(simDt>0){const dt=Math.min(1,simDt);simDt-=dt;stepSim(dt)}}
+  updateParticles(realDt);drawMap();
+  if(now-lastUI>220){lastUI=now;renderUI()}
+  autoResolveAlerts(now);
+  requestAnimationFrame(tick);
+}
+let lastUI=0;
+function stepSim(dt){
+  S.t+=dt;
+  for(const ac of S.aircraft)stepAC(ac,dt);
+  stepTraffic(dt);
+  S.utmT+=dt;if(S.utmT>=1){S.utmT=0;utm()}
+  for(const k in FAC){const w=FAC[k].wx;if(w.fog&&S.t>w.until){w.fog=false;w.vis=10;w.ceil=4500;log('VBL',`${FAC[k].short}: fog lifted, visibility 10 SM.`)}}
+  autoOrders();
+  if(S.demo)demoStep();
+}
+function autoResolveAlerts(now){for(const a of [...S.alerts]){if(now-a.created>a.deadline){const rec=a.options.find(o=>o.rec)||a.options[0];if(a.decision)log('SYS',`No operator input in 15 s. Recommended action applied: ${rec.label}.`);resolveAlert(a.id,rec.act)}}}
+
+/* ================= guided demo ================= */
+const DEMO=[
+  {at:2,title:'Meet HX-201',text:'HX-201 is a Chaparral-class hybrid VTOL carrying a periprosthetic fracture kit from the Louisville hub to Paducah Regional for a 09:45 CDT case. By ground this trip takes about 3½ hours. Watch the Flight Ops panel on the right.'},
+  {at:110,title:'UTM · An aircraft with no transponder',inject:'intruder',text:'Ground radar has picked up a low-flying aircraft with no transponder crossing the route at HX-201\'s altitude. UTM predicts the closest approach about 2½ minutes out and issues a 500 ft altitude change. The red dashed line on the map is the predicted conflict.'},
+  {at:560,title:'Wind estimation · Gust front',inject:'gust',text:'A gust front is moving across the corridor. HX-201 has no wind sensor; it works out the wind by comparing ground velocity with air velocity. When the estimate jumps it re-plans the ETA and drops to a lower altitude where the wind is lighter. See the dial in the Wind estimation card.'},
+  {at:1150,title:'FDI · Cruise motor wear',inject:'cruisemotor',text:'Bearing wear on cruise motor C2 is pushing its current and temperature above what the model predicts. Fault detection flags the residual, isolates C2, derates it and shares the thrust across the other three. Watch the motor grid in the Powertrain card.'},
+  {at:1700,title:'V&V · GPS drift',inject:'gnss',text:'The GPS solution starts drifting sideways, as it would under spoofing. The aircraft thinks it is on track, but the runtime monitor sees GPS disagree with the inertial and visual-odometry solution. It drops GPS and steers back before the 300 m conformance bound is reached.'},
+  {at:2250,title:'UDC · Command link loss',inject:'link',text:'The LTE command link drops. The Universal Data Compiler keeps one fused telemetry stream by switching to SATCOM. Latency rises from ~50 ms to ~900 ms, and the flight carries on.'},
+  {cond:ac=>remaining(ac)<30,title:'Vision-based landing · Fog in Paducah',inject:'fog',text:'Fog has rolled into Paducah: ¼ mile visibility and GPS multipath near the hospital. On final approach the downward camera locks onto the pad markings and guides the vertical landing. Its view appears in the lower right of the map.'},
+  {cond:ac=>ac.phase==='unload'||ac.phase==='parked',title:'Delivered',text:'The implant kit is on the pad ahead of the case, with every fault handled en route. One capability is left: emergency landing. Try a generator failure on HX-202 to watch the planner rank landing sites by population exposure.',final:true},
+];
+function startDemo(){
+  initWorld();S.demo={i:0,t0:0,shown:-1};S.selected='HX-201';setView('ops');S.follow=true;document.getElementById('follow').setAttribute('aria-pressed','true');
+  S.paused=false;setSpeed(30);document.getElementById('intro').hidden=true;fitView();view.s*=1.6;renderGuide();updatePlay();
+}
+function demoStep(){
+  const d=S.demo,st=DEMO[d.i];if(!st)return;const ac=S.aircraft.find(a=>a.id==='HX-201');
+  const go=st.at!==undefined?S.t>=st.at:st.cond(ac);
+  if(go&&d.shown!==d.i){d.shown=d.i;if(st.inject)inject(st.inject,'HX-201');renderGuide();if(!st.final){d.i++}}
+}
+function renderGuide(){
+  const g=document.getElementById('guide');if(!S.demo){g.hidden=true;return}
+  const idx=S.demo.shown<0?0:S.demo.shown;const st=DEMO[idx];if(S.demo.shown<0){g.hidden=true;return}
+  g.hidden=false;
+  g.innerHTML=`<div class="gs">Guided demo · ${idx+1} / ${DEMO.length}</div><h3>${st.title}</h3><p>${st.text}</p><div class="gb">${st.final?'<button class="btn primary" data-g="gen">Fail HX-202\'s generator</button>':''}<button class="btn" data-g="exit">${st.final?'Explore freely':'Exit demo'}</button></div>`;
+}
+
+/* ================= map rendering ================= */
+const cv=document.getElementById('map'),cx=cv.getContext('2d');
+const view={cx:0,cy:0,s:2};let W=0,H=0,DPR=1;
+const B0=xy(36.45,-89.25),B1=xy(38.45,-85.3);
+function fitView(){view.cx=(B0.x+B1.x)/2;view.cy=(B0.y+B1.y)/2;view.s=Math.min(W/(B1.x-B0.x),H/(B1.y-B0.y))*0.97}
+function resize(){const r=cv.getBoundingClientRect();DPR=window.devicePixelRatio||1;const nw=r.width,nh=r.height;const first=!W;W=nw;H=nh;cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);if(first||!view.s)fitView()}
+const sx=x=>W/2+(x-view.cx)*view.s, sy=y=>H/2-(y-view.cy)*view.s;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const COL={};function loadCols(){['--accent','--accent2','--ok','--warn','--crit','--air','--water','--land','--muted','--dim','--text','--line','--line2','--panel','--bg'].forEach(k=>COL[k.slice(2)]=css(k))}
+function path(pts){cx.beginPath();pts.forEach((p,i)=>i?cx.lineTo(sx(p.x),sy(p.y)):cx.moveTo(sx(p.x),sy(p.y)))}
+function circle(p,r){cx.beginPath();cx.arc(sx(p.x),sy(p.y),r*view.s,0,Math.PI*2)}
+let parts=[];
+function updateParticles(rdt){
+  if(!parts.length){for(let i=0;i<170;i++)parts.push({x:B0.x+Math.random()*(B1.x-B0.x),y:B0.y+Math.random()*(B1.y-B0.y),life:Math.random()*6})}
+  for(const p of parts){const w=windAt(p,2000);const k=S.paused?0:500;p.px=p.x;p.py=p.y;p.x+=w.u*k*rdt;p.y+=w.v*k*rdt;p.life-=rdt;p.w=w;if(p.life<=0||p.x<B0.x||p.x>B1.x||p.y<B0.y||p.y>B1.y){p.x=B0.x+Math.random()*(B1.x-B0.x);p.y=B0.y+Math.random()*(B1.y-B0.y);p.life=4+Math.random()*4}}
+}
+function drawMap(){
+  const c=cx;c.setTransform(DPR,0,0,DPR,0,0);
+  if(S.follow){const a=sel();if(a){const oy=(H*0.12)/view.s;view.cx+=(a.x-view.cx)*0.08;view.cy+=(a.y+oy-view.cy)*0.08}}
+  c.fillStyle=COL.land;c.fillRect(0,0,W,H);
+  // graticule
+  c.strokeStyle='rgba(76,141,255,0.07)';c.lineWidth=1;c.font='10px "IBM Plex Mono", monospace';c.fillStyle='rgba(131,147,194,0.45)';
+  for(let la=36.5;la<=38.5;la+=0.5){const p=xy(la,-89.5),q=xy(la,-84.8);path([p,q]);c.stroke();c.fillText(la.toFixed(1)+'°N',6,sy(p.y)-3)}
+  for(let lo=-89;lo<=-85;lo+=0.5){const p=xy(36.2,lo),q=xy(38.8,lo);path([p,q]);c.stroke();c.fillText(Math.abs(lo).toFixed(1)+'°W',sx(p.x)+3,H-6)}
+  // population shading
+  for(const t of TOWNS){const r=(t.r+3)*view.s;const g=c.createRadialGradient(sx(t.x),sy(t.y),0,sx(t.x),sy(t.y),r);g.addColorStop(0,'rgba(255,190,120,0.16)');g.addColorStop(1,'rgba(255,190,120,0)');c.fillStyle=g;c.beginPath();c.arc(sx(t.x),sy(t.y),r,0,7);c.fill()}
+  // borders
+  c.setLineDash([6,5]);c.strokeStyle='rgba(169,198,255,0.22)';c.lineWidth=1.2;BORDERS.forEach(b=>{path(b);c.stroke()});c.setLineDash([]);
+  c.font='600 13px "Barlow Condensed", sans-serif';c.fillStyle='rgba(169,198,255,0.16)';c.textAlign='center';STATE_LABELS.forEach(l=>{c.save();c.letterSpacing='6px';c.fillText(l.n,sx(l.x),sy(l.y));c.restore()});c.textAlign='left';
+  // roads
+  c.strokeStyle='rgba(131,147,194,0.16)';c.lineWidth=1.4;ROADS.forEach(r=>{path(r);c.stroke()});
+  // water
+  c.strokeStyle='#1d4673';c.lineCap='round';c.lineJoin='round';
+  c.lineWidth=3;path(RIVERS.ohio);c.stroke();path(RIVERS.miss);c.stroke();
+  c.lineWidth=1.6;path(RIVERS.tenn);c.stroke();path(RIVERS.cumb);c.stroke();path(RIVERS.green);c.stroke();
+  c.lineWidth=Math.max(4,1.8*view.s);LAKES.forEach(l=>{path(l);c.stroke()});
+  c.font='italic 11px Barlow, sans-serif';c.fillStyle='rgba(111,160,232,0.55)';{const p=xy(37.86,-86.95);c.fillText('Ohio River',sx(p.x),sy(p.y)+14);const q=xy(36.75,-88.32);c.fillText('Kentucky Lake',sx(q.x)-70,sy(q.y))}
+  // airspace
+  for(const a of AIRSPACE){c.strokeStyle='rgba(197,139,255,0.55)';c.setLineDash([4,4]);c.lineWidth=1.1;a.r.forEach(r=>{circle(a,r);c.stroke()});c.setLineDash([]);if(view.s>1.6){c.font='10px "IBM Plex Mono", monospace';c.fillStyle='rgba(197,139,255,0.75)';c.fillText(a.label,sx(a.x)-28,sy(a.y)-a.r[a.r.length-1]*view.s-4)}}
+  for(const r of [...RESTRICTED,...S.tfrs.map(t=>({...t,label:t.id,tfr:true}))]){circle(r,r.r);c.fillStyle=r.tfr?'rgba(255,84,104,0.13)':'rgba(255,122,89,0.08)';c.fill();c.save();c.clip();c.strokeStyle=r.tfr?'rgba(255,84,104,0.35)':'rgba(255,122,89,0.18)';c.lineWidth=1;for(let k=-r.r*2;k<r.r*2;k+=1.6){c.beginPath();c.moveTo(sx(r.x+k-r.r),sy(r.y-r.r));c.lineTo(sx(r.x+k+r.r),sy(r.y+r.r));c.stroke()}c.restore();circle(r,r.r);c.strokeStyle=r.tfr?COL.crit:'#ff7a59';c.lineWidth=1.5;c.stroke();c.font='600 11px "Barlow Condensed", sans-serif';c.fillStyle=r.tfr?'#ffb3bd':'#ffb39a';c.fillText(r.label,sx(r.x)-30,sy(r.y)+3)}
+  // gusts
+  for(const g of S.gusts){const gr=c.createRadialGradient(sx(g.x),sy(g.y),0,sx(g.x),sy(g.y),g.r*view.s);gr.addColorStop(0,`rgba(168,240,181,${0.16*g.fade})`);gr.addColorStop(1,'rgba(168,240,181,0)');c.fillStyle=gr;circle(g,g.r);c.fill();c.font='600 11px "Barlow Condensed", sans-serif';c.fillStyle=`rgba(168,240,181,${0.8*g.fade})`;c.fillText(`GUST FRONT · ${g.dir.toFixed(0)}° ${g.spd} KT`,sx(g.x)-50,sy(g.y))}
+  // wind particles
+  c.lineWidth=1;for(const p of parts){if(p.px===undefined)continue;const sp=Math.hypot(p.w.u,p.w.v)/KT;c.strokeStyle=sp>20?'rgba(168,240,181,0.35)':'rgba(169,198,255,0.13)';c.beginPath();c.moveTo(sx(p.x),sy(p.y));c.lineTo(sx(p.x-p.w.u*400),sy(p.y-p.w.v*400));c.stroke()}
+  // towns
+  c.font='11px Barlow, sans-serif';for(const t of TOWNS){const big=t.pop>25;if(!big&&view.s<2.2)continue;c.fillStyle='rgba(223,231,255,'+(big?0.55:0.35)+')';c.beginPath();c.arc(sx(t.x),sy(t.y),big?2.5:1.6,0,7);c.fill();c.fillText(t.name,sx(t.x)+5,sy(t.y)+4)}
+  // routes
+  const selAc=sel();
+  for(const ac of S.aircraft){if(!ac.route.length||(!airborne(ac)&&ac.phase!=='preflight'))continue;const isSel=ac===selAc;const rest=[{x:ac.x,y:ac.y},...ac.route.slice(ac.wp)];
+    c.setLineDash(isSel?[]:[5,5]);c.strokeStyle=ac.emergency?COL.crit:(isSel?COL.accent:'rgba(76,141,255,0.45)');c.lineWidth=isSel?2.2:1.3;path(rest);c.stroke();c.setLineDash([]);
+    if(isSel){c.fillStyle=COL.accent2;c.font='10px "IBM Plex Mono", monospace';ac.route.slice(ac.wp,-1).forEach(p=>{c.beginPath();c.moveTo(sx(p.x),sy(p.y)-4);c.lineTo(sx(p.x)+4,sy(p.y));c.lineTo(sx(p.x),sy(p.y)+4);c.lineTo(sx(p.x)-4,sy(p.y));c.closePath();c.strokeStyle=COL.accent2;c.lineWidth=1;c.stroke();if(p.name&&view.s>1.8)c.fillText(p.name,sx(p.x)+6,sy(p.y)-5)})}
+    if(ac.trail.length>1){c.strokeStyle='rgba(169,198,255,0.25)';c.lineWidth=1;path([...ac.trail,{x:ac.x,y:ac.y}]);c.stroke()}
+  }
+  // ELS
+  for(const ac of S.aircraft){if(!ac.els)continue;if(airborne(ac)){circle(ac,Math.min(reachKm(ac),45));c.strokeStyle='rgba(61,220,151,0.35)';c.setLineDash([3,4]);c.lineWidth=1;c.stroke();c.setLineDash([])}
+    ac.els.forEach((s,i)=>{c.beginPath();c.arc(sx(s.x),sy(s.y),i===0?9:7,0,7);c.strokeStyle=COL.ok;c.lineWidth=i===0?2.2:1.3;c.stroke();c.fillStyle=COL.ok;c.font='600 11px "Barlow Condensed", sans-serif';c.fillText(`ELS-${i+1} · ${s.score.toFixed(2)}`,sx(s.x)+12,sy(s.y)+4)})}
+  // facilities
+  for(const k in FAC){const f=FAC[k];const X=sx(f.x),Y=sy(f.y);
+    if(f.type==='hub'){c.fillStyle=COL.accent;c.fillRect(X-6,Y-6,12,12);c.fillStyle=COL.land;c.font='700 9px "Barlow Condensed", sans-serif';c.fillText('H',X-2.5,Y+3.5)}
+    else if(f.type==='vertiport'){c.beginPath();c.arc(X,Y,6,0,7);c.strokeStyle=COL.accent2;c.lineWidth=1.6;c.stroke();c.fillStyle=COL.accent2;c.font='700 9px "Barlow Condensed", sans-serif';c.fillText('H',X-2.5,Y+3.2)}
+    else{c.fillStyle='#ff6b7d';c.fillRect(X-1.6,Y-5.5,3.2,11);c.fillRect(X-5.5,Y-1.6,11,3.2)}
+    c.font='600 11px "Barlow Condensed", sans-serif';c.fillStyle=f.wx.fog?'#f0ea8f':'rgba(223,231,255,0.85)';
+    const lx=k==='POS'?X+8:(k==='PVP'?X-62:X+8),ly=k==='POS'?Y+12:(k==='PRH'?Y-8:Y+4);if(view.s>1.5||f.type==='hub'||k==='PRH')c.fillText(f.short+(f.wx.fog?' · FOG':''),lx,ly)}
+  // conflicts
+  for(const cf of S.conflicts){c.strokeStyle=cf.resolved?'rgba(255,181,71,0.7)':COL.crit;c.setLineDash([4,3]);c.lineWidth=1.5;c.beginPath();c.moveTo(sx(cf.a.x),sy(cf.a.y));c.lineTo(sx(cf.b.x),sy(cf.b.y));c.stroke();c.setLineDash([]);c.beginPath();c.arc(sx(cf.cpa.x),sy(cf.cpa.y),1.85*view.s,0,7);c.strokeStyle=cf.resolved?'rgba(255,181,71,0.5)':'rgba(255,84,104,0.7)';c.stroke()}
+  // traffic
+  for(const t of S.traffic){const X=sx(t.x),Y=sy(t.y);const col=t.coop?'rgba(223,231,255,0.8)':'#ff9b5a';c.strokeStyle=col;c.fillStyle=col;c.lineWidth=1.4;
+    if(t.kind==='uas'){c.strokeRect(X-3.5,Y-3.5,7,7)}else{c.beginPath();c.moveTo(X,Y-5);c.lineTo(X+5,Y);c.lineTo(X,Y+5);c.lineTo(X-5,Y);c.closePath();t.coop?c.stroke():c.fill()}
+    if(t.vx||t.vy){const L=Math.hypot(t.vx,t.vy)||1;c.beginPath();c.moveTo(X,Y);c.lineTo(X+t.vx/L*14,Y-t.vy/L*14);c.stroke()}
+    if(view.s>1.4||!t.coop){c.font='10px "IBM Plex Mono", monospace';c.fillText(`${t.id} ${pad2(Math.round(t.alt/100)).padStart(3,'0')}`,X+7,Y-5)}}
+  // aircraft
+  for(const ac of S.aircraft){if(!airborne(ac)&&ac.phase!=='preflight')continue;drawAC(ac,ac===selAc)}
+  for(const ac of S.aircraft){if(airborne(ac)||ac.phase==='preflight')continue;if(ac===selAc){c.beginPath();c.arc(sx(ac.x),sy(ac.y),10,0,7);c.strokeStyle=COL.text;c.lineWidth=1.2;c.stroke()}
+    if(ac.phase==='landed_off'){drawAC(ac,ac===selAc)}}
+  // scale bar
+  const nmPx=10*NM*view.s;c.strokeStyle='rgba(223,231,255,0.6)';c.lineWidth=1.2;c.beginPath();c.moveTo(16,H-28);c.lineTo(16+nmPx,H-28);c.moveTo(16,H-32);c.lineTo(16,H-24);c.moveTo(16+nmPx,H-32);c.lineTo(16+nmPx,H-24);c.stroke();c.fillStyle='rgba(223,231,255,0.7)';c.font='10px "IBM Plex Mono", monospace';c.fillText('10 nm',20,H-34);
+  drawVcam();
+}
+function drawAC(ac,isSel){
+  const c=cx,X=sx(ac.x),Y=sy(ac.y);const warn=ac.emergency||ac.genFail||ac.phase==='landed_off'?COL.crit:(ac.motors.some(m=>m.isolated)||ac.navMode!=='GNSS + INS'||!ac.link.lte||ac.utmRes?COL.warn:COL.accent);
+  if(isSel){c.beginPath();c.arc(X,Y,14,0,7);c.fillStyle='rgba(76,141,255,0.16)';c.fill();c.strokeStyle=COL.text;c.lineWidth=1;c.stroke()}
+  c.save();c.translate(X,Y);c.rotate(ac.hdg*Math.PI/180);c.fillStyle=warn;c.strokeStyle=warn;c.lineWidth=1.6;
+  c.beginPath();c.moveTo(0,-9);c.lineTo(0,8);c.stroke();// fuselage
+  c.beginPath();c.moveTo(-10,-1.5);c.lineTo(10,-1.5);c.lineWidth=2.4;c.stroke();// wing
+  c.lineWidth=1.2;c.beginPath();c.moveTo(-5,-6);c.lineTo(-5,5);c.moveTo(5,-6);c.lineTo(5,5);c.stroke();// booms
+  c.beginPath();c.moveTo(-4,8);c.lineTo(4,8);c.lineWidth=1.8;c.stroke();// tail
+  c.restore();
+  c.font='600 12px "Barlow Condensed", sans-serif';c.fillStyle=isSel?COL.text:'rgba(223,231,255,0.85)';c.fillText(ac.id,X+13,Y-4);
+  c.font='10px "IBM Plex Mono", monospace';c.fillStyle='rgba(169,198,255,0.85)';
+  const vsA=ac.vs>50?'↑':(ac.vs<-50?'↓':'');c.fillText(`${String(Math.round(ac.alt/100)).padStart(3,'0')}${vsA} ${Math.round(ac.gs)}kt`,X+13,Y+8);
+}
+/* vision cam */
+function drawVcam(){
+  const a=sel();const box=document.getElementById('vcam');
+  const show=a&&(a.phase==='approach'||a.phase==='vtol_land'||(a.phase==='descent'&&remaining(a)<5));
+  if(box.hidden===!!show)box.hidden=!show;if(!show)return;
+  const v=document.getElementById('vcamc'),c=v.getContext('2d'),w=v.width,h=v.height;
+  const f=a.emergency?null:FAC[a.divertTo||(a.mission&&a.mission.to)];const fog=f&&f.wx.fog;
+  const end=a.route[a.route.length-1]||a;const ex=(end.x-a.x)*1000,ey=(end.y-a.y)*1000;// m
+  const altM=Math.max(3,a.alt*0.3048);const px=w*0.9/ (altM*1.2);// px per m
+  c.fillStyle='#24361f';c.fillRect(0,0,w,h);
+  // ground texture
+  c.save();c.translate(w/2-ex*px,h/2+ey*px);
+  c.fillStyle='#2e4528';for(let i=-6;i<=6;i++){c.fillRect(i*40*px,-400*px,20*px,800*px)}
+  if(f){c.fillStyle='#5a5f66';c.fillRect(-14*px,-14*px,28*px,28*px);c.strokeStyle='#e8e8e8';c.lineWidth=Math.max(1,0.6*px);c.beginPath();c.arc(0,0,9*px,0,7);c.stroke();
+    c.fillStyle='#f2f2f2';c.fillRect(-4*px,-5*px,1.6*px,10*px);c.fillRect(2.4*px,-5*px,1.6*px,10*px);c.fillRect(-4*px,-0.8*px,8*px,1.6*px);
+    c.fillStyle='#ffd23f';[[-12,-12],[12,-12],[-12,12],[12,12]].forEach(([qx,qy])=>c.fillRect((qx-1.2)*px,(qy-1.2)*px,2.4*px,2.4*px))}
+  else{c.fillStyle='#3d5a33';c.fillRect(-30*px,-30*px,60*px,60*px)}
+  c.restore();
+  if(fog){c.fillStyle='rgba(200,205,210,'+clamp(0.25+altM/180,0.25,0.75)+')';c.fillRect(0,0,w,h);for(let i=0;i<400;i++){c.fillStyle='rgba(255,255,255,0.06)';c.fillRect(Math.random()*w,Math.random()*h,2,2)}}
+  const errM=Math.hypot(ex,ey);const lock=f&&errM<altM*0.55&&(altM<(fog?90:250));const conf=lock?clamp((fog?0.86:0.97)-errM/400+Math.random()*0.02,0.5,0.99):0;
+  c.strokeStyle='rgba(169,198,255,0.6)';c.lineWidth=1.5;c.beginPath();c.moveTo(w/2-16,h/2);c.lineTo(w/2+16,h/2);c.moveTo(w/2,h/2-16);c.lineTo(w/2,h/2+16);c.stroke();
+  if(lock){const bx=w/2-ex*px,by=h/2+ey*px,bs=34*px;c.strokeStyle='#3ddc97';c.lineWidth=2;c.strokeRect(bx-bs/2,by-bs/2,bs,bs);c.fillStyle='#3ddc97';c.font='600 20px "IBM Plex Mono", monospace';c.fillText(`PAD ${conf.toFixed(2)}`,bx-bs/2,by-bs/2-8)}
+  c.fillStyle='rgba(5,12,32,0.7)';c.fillRect(0,h-44,w,44);c.fillStyle='#dfe7ff';c.font='19px "IBM Plex Mono", monospace';
+  c.fillText(`ALT ${Math.round(a.alt)} ft  ERR ${errM<1000?errM.toFixed(1)+' m':(errM/1000).toFixed(1)+' km'}`,12,h-16);
+  document.getElementById('vcamStat').textContent=!f?'Off-field':(lock?(fog?'Lock · GPS degraded':'Lock · GPS ok'):(fog?'Searching · fog':'Searching'));
+}
+
+/* ================= UI rendering ================= */
+const $=id=>document.getElementById(id);
+const sel=()=>S.aircraft.find(a=>a.id===S.selected);
+function setHTML(el,html){if(el._h!==html){el._h=html;el.innerHTML=html}}
+const PHASE={parked:['On ground','idle'],unload:['Unloading','info'],preflight:['Pre-flight','info'],vtol_climb:['Vertical climb','info'],transition:['Transition','info'],climb:['Climb','ok'],cruise:['Cruise','ok'],hold:['Holding','warn'],descent:['Descent','ok'],approach:['Approach','info'],vtol_land:['Vertical landing','info'],landed_off:['Off-field landing','crit']};
+function phaseChip(ac){const p=PHASE[ac.phase]||[ac.phase,'idle'];let cls=p[1];if(ac.emergency&&airborne(ac))return'<span class="chip crit">Emergency</span>';if(ac.divertTo&&airborne(ac))return'<span class="chip warn">Diverting</span>';return`<span class="chip ${cls}">${p[0]}</span>`}
+function locName(ac){if(ac.at&&FAC[ac.at])return FAC[ac.at].short;const ll=toLL(ac.x,ac.y);return`${ll.lat.toFixed(3)}N ${Math.abs(ll.lon).toFixed(3)}W`}
+
+function renderUI(){
+  $('clkE').textContent=fmtClock(S.t,'E');$('clkC').textContent=fmtClock(S.t,'C');
+  if(S.view==='ops')renderOps();else renderDispatch();
+  renderAlerts(false);if(S.logDirty)renderLog();
+}
+function opsHeader(ac){
+  const m=ac.mission;const f=m?FAC[ac.divertTo||m.to]:null;
+  const total=m?routeLen(ac.route.length?ac.route:[FAC[m.from],FAC[m.to]]):0;const rem=remaining(ac);const prog=m&&airborne(ac)?clamp(1-rem/Math.max(total,1),0,1):(ac.phase==='unload'?1:0);
+  const eta=m&&(airborne(ac)||ac.phase==='preflight')?S.t+etaSec(ac):null;
+  const opts=S.aircraft.map(a=>`<option value="${a.id}"${a.id===ac.id?' selected':''}>${a.id}</option>`).join('');
+  return`<div class="achead">
+   <div class="row1"><span class="cs">${ac.id}</span>${phaseChip(ac)}${m?`<span class="chip ${m.pri==='STAT'?'crit':(m.pri==='SCHED'?'info':'idle')}">${m.pri}</span>`:''}<select id="acSel" aria-label="Select aircraft">${opts}</select></div>
+   <div class="sub">${m?`${FAC[m.from].short} → ${f?f.short:'—'} · ${m.item} · ${m.kg} kg`:`At ${locName(ac)} · available`}${ac.emergency?` · <span class="c-crit">landing at ${ac.emergencySite}</span>`:''}</div>
+   ${m?`<div class="bar" aria-label="Route progress"><i style="width:${(prog*100).toFixed(1)}%"></i></div>`:''}
+   <div class="kv">
+    <div><small>Altitude</small><span>${fmtInt(ac.alt)} ft</span></div>
+    <div><small>Groundspeed</small><span>${Math.round(ac.gs)} kt</span></div>
+    <div><small>Heading</small><span>${String(Math.round(ac.hdg)).padStart(3,'0')}°</span></div>
+    <div><small>Remaining</small><span>${m&&airborne(ac)?(rem/NM).toFixed(1)+' nm':'—'}</span></div>
+    <div><small>ETA ${f?tzName(f.tz):''}</small><span>${eta&&f?fmtClock(eta,f.tz,false):'—'}</span></div>
+    <div><small>Case time</small><span>${m&&m.caseT!=null&&f?fmtClock(m.caseT,f.tz,false):'—'}</span></div>
+   </div></div>`;
+}
+function opsControls(ac){
+  const air=airborne(ac)&&!['vtol_climb','vtol_land','approach'].includes(ac.phase);
+  const b=(act,label,en,cls='')=>`<button class="btn ${cls}" data-act="${act}" ${en?'':'disabled'}>${label}</button>`;
+  return`<div class="ctl">${ac.phase==='hold'?b('resume','Resume',true,'primary'):b('hold','Hold',air)}${b('alt:500','Climb 500',air)}${b('alt:-500','Desc 500',air)}${b('divert:'+(nearestFacility(ac,ac.mission?ac.mission.to:null)||{}).id,'Divert',air&&!!ac.mission)}${b('rtb','Return base',air&&ac.at!==ac.home)}${b('elsplan','Emerg. land',air,'danger')}${b('select-next','Next ✈',true)}${b('dispatch','Dispatch ↗',true)}</div>`;
+}
+function motorTile(m){const st=m.failed?'bad':(m.isolated?'warn':(m.cur>2?'on':'idle'));return`<div class="motor ${st}"><b>${m.name}</b> ${m.failed?'FAIL':(m.isolated?'ISO':'')}<br>${m.cur.toFixed(0).padStart(3,' ')} A · ${m.temp.toFixed(0)}°</div>`}
+function renderOps(){
+  const ac=sel();if(!ac)return;const el=$('viewOps');
+  if(!el._built){el.innerHTML=`<div class="card"><div class="cb" id="opsHead"></div><div class="cb" style="padding-top:0" id="opsCtl"></div></div>
+   <div class="card" style="margin-top:12px"><h4>Powertrain health <span class="tag FDI">FDI</span><span class="chip" id="fdiChip"></span></h4><div class="cb"><div id="motors"></div><div class="kv" id="pwr" style="margin-bottom:8px"></div><div class="lbl" style="margin-bottom:3px">Max motor residual vs model · threshold 12%</div><canvas class="spark" id="spRes"></canvas></div></div>
+   <div class="card" style="margin-top:12px"><h4>Runtime verification <span class="tag VV">V&amp;V</span><span class="chip" id="vvChip"></span></h4><div class="cb"><div class="lbl" style="margin-bottom:3px">Cross-track deviation from verified plan · bound ±300 m</div><canvas class="spark" id="spXte"></canvas><ul class="checks" id="checks"></ul></div></div>
+   <div class="card" style="margin-top:12px"><h4>Unified telemetry <span class="tag UDC">UDC</span><span class="chip" id="udcChip"></span></h4><div class="cb"><div style="overflow-x:auto"><table class="t" id="srcT"></table></div><div class="lbl" style="margin:8px 0 3px">Altitude · battery · fuel</div><canvas class="spark" id="spTel"></canvas><div class="stream" id="stream"></div></div></div>
+   <div class="card" style="margin-top:12px"><h4>Wind estimation <span class="tag WIND">WIND</span></h4><div class="cb windrow"><canvas id="windc" width="240" height="240"></canvas><div id="windTxt" class="sub"></div></div></div>
+   <div class="card" style="margin-top:12px"><h4>Traffic &amp; airspace <span class="tag UTM">UTM</span><span class="chip" id="utmChip"></span></h4><div class="cb"><div style="overflow-x:auto"><table class="t" id="trafT"></table></div><ul class="checks" id="airChecks"></ul></div></div>`;el._built=true}
+  setHTML($('opsHead'),opsHeader(ac));setHTML($('opsCtl'),opsControls(ac));
+  // FDI
+  const M=ac.motors;setHTML($('motors'),`<div class="grp">Lift · vertical flight</div><div class="motors">${M.slice(0,8).map(motorTile).join('')}</div><div class="grp">Cruise · forward flight</div><div class="motors">${M.slice(8).map(motorTile).join('')}</div>`);
+  setHTML($('pwr'),`<div><small>Generator</small><span class="${ac.genOK?'':'c-crit'}">${ac.genOK?ac.genKw.toFixed(0)+' kW':'FAILED'}</span></div><div><small>Battery</small><span class="${ac.soc<30?'c-warn':''}">${ac.soc.toFixed(1)}%</span></div><div><small>Fuel</small><span>${ac.fuel.toFixed(1)}%</span></div><div><small>HV bus</small><span>${ac.busV.toFixed(0)} V</span></div><div><small>Bus current</small><span>${ac.cur.toFixed(0)} A</span></div><div><small>Demand</small><span>${ac.demand.toFixed(0)} kW</span></div>`);
+  const fdiS=!ac.genOK?['crit','Generator out']:(M.some(m=>m.failed&&m.flagged)?['warn','7/8 lift']:(M.some(m=>m.isolated)?['warn','Isolated']:['ok','No faults']));const fc=$('fdiChip');fc.className='chip '+fdiS[0];fc.textContent=fdiS[1];
+  spark($('spRes'),[ac.hist.map(h=>h.res*100)],{min:0,max:40,th:12,cols:[COL.warn],unit:'%'});
+  // V&V
+  spark($('spXte'),[ac.hist.map(h=>h.xte)],{min:-350,max:350,th:300,th2:-300,cols:[COL.accent2],unit:' m',zero:true});
+  const div=Math.hypot(ac.navBias.x,ac.navBias.y)*1000;const air=airborne(ac);
+  const inGeo=!RESTRICTED.some(r=>dist(ac,r)<r.r)&&!S.tfrs.some(r=>dist(ac,r)<r.r);
+  const altOk=!air||ac.phase!=='cruise'||Math.abs(ac.alt-targetAlt(ac))<300;
+  const arrSoc=reserveAtArrival(ac);
+  const checks=[['Geofence conformance',inGeo?'PASS':'VIOLATION',inGeo?'ok':'crit'],['Altitude band',altOk?'PASS':'TRANSITION',altOk?'ok':'warn'],['Energy reserve at arrival',air?`${arrSoc.toFixed(0)}% ${arrSoc>20?'PASS':'LOW'}`:'—',arrSoc>20||!air?'ok':'crit'],['Nav integrity (GPS vs INS)',air?`${div.toFixed(0)} m · ${ac.navMode}`:'—',ac.navMode==='GNSS + INS'?(div>60?'warn':'ok'):'warn'],['Trajectory conformance',air?`${Math.abs(ac.xte).toFixed(0)} m`:'—',Math.abs(ac.xte)<300?'ok':'crit']];
+  setHTML($('checks'),checks.map(c=>`<li><span>${c[0]}</span><span class="c-${c[2]}">${c[1]}</span></li>`).join(''));
+  const vvS=checks.some(c=>c[2]==='crit')?['crit','Violation']:(checks.some(c=>c[2]==='warn')?['warn','Monitoring']:['ok','Conforming']);const vc=$('vvChip');vc.className='chip '+(air?vvS[0]:'idle');vc.textContent=air?vvS[1]:'Standby';
+  // UDC
+  const lat=latency(ac);const srcs=[['C2 · LTE',ac.link.lte,ac.link.lte?lat+' ms':'—',ac.link.lte?'10 Hz':'—',ac.link.lte?'PRIMARY':'LOST'],['C2 · SATCOM',ac.link.sat,ac.link.lte?'standby':lat+' ms',ac.link.lte?'—':'1 Hz',ac.link.lte?'STANDBY':'PRIMARY'],['ADS-B Out',air,'—','2 Hz',air?'ACTIVE':'OFF'],['Remote ID',true,'—','1 Hz','ACTIVE'],['Onboard recorder',true,'local','50 Hz','RECORDING']];
+  setHTML($('srcT'),`<tr><th>Source</th><th>Latency</th><th>Rate</th><th>State</th></tr>`+srcs.map(s=>`<tr><td>${s[0]}</td><td>${s[2]}</td><td>${s[3]}</td><td class="${s[4]==='LOST'?'c-crit':(s[4]==='PRIMARY'?'c-ok':'c-muted')}">${s[4]}</td></tr>`).join(''));
+  const uc=$('udcChip');uc.className='chip '+(ac.link.lte?'ok':'warn');uc.textContent=ac.link.lte?'5 sources fused':'Failover · SATCOM';
+  spark($('spTel'),[ac.hist.map(h=>h.alt/30),ac.hist.map(h=>h.soc),ac.hist.map(h=>h.fuel)],{min:0,max:100,cols:[COL.accent2,COL.ok,COL.warn],legend:['alt (ft/30)','battery %','fuel %']});
+  const ll=toLL(ac.x,ac.y);const row=`${fmtClock(S.t,'E')} ${ac.id} ${ll.lat.toFixed(4)}N ${Math.abs(ll.lon).toFixed(4)}W ALT ${String(Math.round(ac.alt)).padStart(4,' ')} GS ${String(Math.round(ac.gs)).padStart(3,' ')} HDG ${String(Math.round(ac.hdg)).padStart(3,'0')} SOC ${ac.soc.toFixed(0)} FUEL ${ac.fuel.toFixed(0)} SRC=${streamSrc(ac)}`;
+  if(!S.paused){ac.stream.unshift(row);if(ac.stream.length>7)ac.stream.pop()}$('stream').textContent=(ac.stream.length?ac.stream:[row]).join('\n');
+  // wind
+  drawWind(ac);
+  // UTM
+  const near=[...S.traffic,...S.aircraft.filter(a=>a!==ac&&airborne(a))].map(t=>({t,d:dist(ac,t)})).sort((a,b)=>a.d-b.d).slice(0,5);
+  const confl=S.conflicts.filter(c=>c.a===ac||c.b===ac);
+  setHTML($('trafT'),`<tr><th>Traffic</th><th>Type</th><th>Range</th><th>Alt</th><th>Δ alt</th></tr>`+near.map(({t,d})=>{const isC=confl.some(c=>c.a===t||c.b===t);const typ=t.cruiseAlt!==undefined?'Helix':(t.coop?t.label:'Non-coop');return`<tr class="${isC?'sel':''}"><td class="${isC?'c-warn':''}">${t.id}</td><td>${typ}</td><td>${(d/NM).toFixed(1)} nm</td><td>${fmtInt(t.alt)}</td><td>${(t.alt-ac.alt>0?'+':'')}${fmtInt(t.alt-ac.alt)}</td></tr>`}).join(''));
+  const utS=confl.length?(confl.some(c=>!c.resolved)?['crit','Conflict']:['warn','Resolving']):['ok','Separated'];const uch=$('utmChip');uch.className='chip '+(air?utS[0]:'idle');uch.textContent=air?utS[1]:'Standby';
+  const auth=AIRSPACE.filter(a=>dist(ac,a)<a.r[a.r.length-1]);const tfrNear=S.tfrs.map(t=>t.id);
+  setHTML($('airChecks'),[['Operation volume',air||ac.phase==='preflight'?'APPROVED':'—',air?'ok':'muted'],['Assigned altitude',air?`${fmtInt(targetAlt(ac))} ft${ac.utmOff?' (resolution)':''}${ac.windAdj?' (wind)':''}`:'—',ac.utmOff?'warn':'ok'],['Controlled airspace',auth.length?auth.map(a=>a.id).join(', ')+' · authorized':'Class G / E',auth.length?'ok':'muted'],['Active TFRs',tfrNear.length?tfrNear.length+' active':'None',tfrNear.length?'warn':'ok']].map(c=>`<li><span>${c[0]}</span><span class="c-${c[2]}">${c[1]}</span></li>`).join(''));
+}
+function reserveAtArrival(ac){if(!airborne(ac))return ac.soc;const t=remaining(ac)/(Math.max(ac.gs,40)*KT);if(ac.genOK)return Math.min(90,ac.soc+t*0.017)-8;return ac.soc-t*(96/1440)-8}
+function spark(cvs,series,o){
+  const r=cvs.getBoundingClientRect();if(!r.width)return;const d=window.devicePixelRatio||1;if(cvs.width!==Math.round(r.width*d)){cvs.width=Math.round(r.width*d);cvs.height=Math.round(r.height*d)}
+  const c=cvs.getContext('2d');c.setTransform(d,0,0,d,0,0);const w=r.width,h=r.height;c.clearRect(0,0,w,h);
+  const y=v=>h-4-(clamp(v,o.min,o.max)-o.min)/(o.max-o.min)*(h-8);
+  c.strokeStyle='rgba(76,141,255,0.08)';c.lineWidth=1;for(let i=1;i<4;i++){c.beginPath();c.moveTo(0,h*i/4);c.lineTo(w,h*i/4);c.stroke()}
+  if(o.zero){c.strokeStyle='rgba(169,198,255,0.25)';c.beginPath();c.moveTo(0,y(0));c.lineTo(w,y(0));c.stroke()}
+  [o.th,o.th2].forEach(t=>{if(t===undefined)return;c.setLineDash([4,3]);c.strokeStyle='rgba(255,84,104,0.6)';c.beginPath();c.moveTo(0,y(t));c.lineTo(w,y(t));c.stroke();c.setLineDash([])});
+  series.forEach((s,k)=>{if(s.length<2)return;const n=160;const xs=i=>w-(s.length-1-i)*(w/(n-1));c.strokeStyle=o.cols[k];c.lineWidth=1.6;c.beginPath();s.forEach((v,i)=>i?c.lineTo(xs(i),y(v)):c.moveTo(xs(i),y(v)));c.stroke();
+    if(series.length===1){c.lineTo(xs(s.length-1),h);c.lineTo(xs(0),h);c.closePath();c.globalAlpha=0.12;c.fillStyle=o.cols[k];c.fill();c.globalAlpha=1}
+    c.fillStyle=o.cols[k];c.beginPath();c.arc(xs(s.length-1),y(s[s.length-1]),2.6,0,7);c.fill()});
+  c.font='10px "IBM Plex Mono", monospace';c.fillStyle='rgba(131,147,194,0.85)';
+  if(o.legend){let lx=6;o.legend.forEach((l,k)=>{c.fillStyle=o.cols[k];c.fillRect(lx,6,8,2);c.fillStyle='rgba(131,147,194,0.95)';c.fillText(l,lx+11,10);lx+=c.measureText(l).width+24})}
+  else{const s=series[0];if(s.length)c.fillText(`${s[s.length-1].toFixed(0)}${o.unit||''}`,6,12)}
+}
+function drawWind(ac){
+  const cvs=$('windc'),c=cvs.getContext('2d'),w=240,h=240,R=95;c.clearRect(0,0,w,h);c.save();c.translate(w/2,h/2);
+  c.strokeStyle='rgba(76,141,255,0.25)';c.lineWidth=1.5;[R,R*0.66,R*0.33].forEach(r=>{c.beginPath();c.arc(0,0,r,0,7);c.stroke()});
+  c.fillStyle='rgba(131,147,194,0.9)';c.font='600 18px "Barlow Condensed", sans-serif';c.textAlign='center';c.fillText('N',0,-R-6+16);c.fillText('S',0,R-4);c.fillText('E',R-10,6);c.fillText('W',-R+10,6);
+  const truth=windAt(ac,ac.alt);const scale=R/45/KT;
+  const arrow=(u,v,col,lw)=>{const x=u*scale,y=-v*scale;c.strokeStyle=col;c.fillStyle=col;c.lineWidth=lw;c.beginPath();c.moveTo(0,0);c.lineTo(x,y);c.stroke();const a=Math.atan2(y,x);c.beginPath();c.moveTo(x,y);c.lineTo(x-12*Math.cos(a-0.4),y-12*Math.sin(a-0.4));c.lineTo(x-12*Math.cos(a+0.4),y-12*Math.sin(a+0.4));c.closePath();c.fill()};
+  arrow(truth.u,truth.v,'rgba(169,198,255,0.35)',3);
+  const air=airborne(ac)&&ac.tas>20;if(air)arrow(ac.west.u,ac.west.v,COL.ok,4);
+  c.rotate(ac.hdg*Math.PI/180);c.strokeStyle=COL.text;c.lineWidth=2;c.beginPath();c.moveTo(0,-18);c.lineTo(0,14);c.moveTo(-14,-3);c.lineTo(14,-3);c.stroke();c.restore();
+  const e=windDirSpd(ac.west.u,ac.west.v),t=windDirSpd(truth.u,truth.v);const trk=ac.trk*Math.PI/180;const head=-(ac.west.u*Math.sin(trk)+ac.west.v*Math.cos(trk))/KT;
+  setHTML($('windTxt'),air?`<div class="kv" style="grid-template-columns:1fr 1fr"><div><small>Estimate</small><span class="c-ok">${String(Math.round(e.dir)).padStart(3,'0')}° / ${e.spd.toFixed(0)} kt</span></div><div><small>Actual (sim)</small><span>${String(Math.round(t.dir)).padStart(3,'0')}° / ${t.spd.toFixed(0)} kt</span></div><div><small>${head>=0?'Headwind':'Tailwind'}</small><span>${Math.abs(head).toFixed(0)} kt</span></div><div><small>TAS → GS</small><span>${Math.round(ac.tas)} → ${Math.round(ac.gs)}</span></div></div><p style="margin:8px 0 0;font-size:12px">Estimated as ground velocity minus air velocity. No wind sensor needed.</p>`:'<p class="empty">The estimator runs in forward flight. Select an airborne aircraft.</p>');
+}
+function renderDispatch(){
+  const k=S.kpi;
+  setHTML($('kpis'),`<div class="kpi"><b>${k.delivered}</b><small>Deliveries today</small></div><div class="kpi"><b>${k.delivered?Math.round(k.onTime/k.delivered*100):100}%</b><small>On time for case</small></div><div class="kpi"><b>${k.protected}</b><small>STAT cases protected</small></div><div class="kpi"><b>${fmtDur(k.saved/Math.max(1,k.delivered))}</b><small>Avg. time saved vs ground</small></div><div class="kpi"><b>${k.conflicts}</b><small>Traffic conflicts resolved</small></div><div class="kpi"><b>${k.events}</b><small>Safety events handled</small></div>`);
+  const pend=S.orders.filter(o=>o.status==='pending');$('qCount').textContent=pend.length+' pending';
+  setHTML($('orders'),pend.length?pend.map(o=>{const el=eligible(o);const f=FAC[o.to];const g=groundMin(FAC[o.from],f);const air=dist(FAC[o.from],f)/(110*KT)/60+8;
+    return`<div class="order ${o.pri}"><div class="r1"><span class="chip ${o.pri==='STAT'?'crit':(o.pri==='SCHED'?'info':'idle')}">${o.pri}</span><b>${o.item}</b><span class="mono">${o.id}</span></div>
+     <div class="sub">${FAC[o.from].short} → ${f.name} · ${o.kg} kg${o.caseT!=null?` · case ${fmtClock(o.caseT,f.tz,false)} ${tzName(f.tz)}`:''}<br><span class="mono" style="font-size:11.5px">Air ≈ ${fmtDur(air*60)} · ground ≈ ${fmtDur(g*60)}</span></div>
+     <div class="r3">${el.length?`<select data-osel="${o.id}" aria-label="Aircraft for ${o.id}">${el.map(a=>`<option value="${a.id}">${a.id} · ready at ${FAC[a.at].short}</option>`).join('')}</select><button class="btn primary" data-launch="${o.id}">Assign &amp; launch</button>`:`<span class="sub">No aircraft available at ${FAC[o.from].short}</span>`}</div></div>`}).join(''):'<div class="empty">Queue clear. New requests arrive from hospitals through the day, or add one below.</div>');
+  const act=S.aircraft.filter(a=>a.mission&&(airborne(a)||a.phase==='preflight'));
+  setHTML($('missions'),act.length?`<div style="overflow-x:auto"><table class="t"><tr><th>Aircraft</th><th>Route</th><th>Progress</th><th>ETA</th><th>State</th></tr>${act.map(a=>{const m=a.mission;const f=FAC[a.divertTo||m.to];const tot=routeLen([FAC[m.from],...a.route.slice(1)])||1;const p=a.phase==='preflight'?0:clamp(1-remaining(a)/tot,0,1);
+      return`<tr class="click ${a.id===S.selected?'sel':''}" data-pick="${a.id}"><td>${a.id}</td><td>${FAC[m.from].short.split(' ')[0]}→${a.emergency?'ELS':f.short.split(' ')[0]}</td><td style="min-width:70px"><div class="bar"><i style="width:${(p*100).toFixed(0)}%;${a.emergency?'background:var(--crit)':''}"></i></div></td><td>${a.emergency?'—':fmtClock(S.t+etaSec(a),f.tz,false)}</td><td>${phaseChip(a)}</td></tr>`}).join('')}</table></div>`:'<div class="empty">No aircraft in the air.</div>');
+  setHTML($('fleet'),`<table class="t"><tr><th>Aircraft</th><th>Location</th><th>Fuel</th><th>Batt</th><th>Health</th></tr>${S.aircraft.map(a=>{const h=!a.genOK?'<span class="c-crit">Gen out</span>':(a.motors.some(m=>m.isolated)?'<span class="c-warn">Fault</span>':(a.navMode!=='GNSS + INS'||!a.link.lte?'<span class="c-warn">Degraded</span>':'<span class="c-ok">OK</span>'));
+    return`<tr class="click ${a.id===S.selected?'sel':''}" data-pick="${a.id}"><td>${a.id}</td><td>${airborne(a)?(PHASE[a.phase]||[a.phase])[0]:(a.phase==='landed_off'?'Off-field':locName(a))}</td><td>${a.fuel.toFixed(0)}%</td><td>${a.soc.toFixed(0)}%</td><td>${h}</td></tr>`}).join('')}</table>`);
+  const wl=['LOU','OWB','MDV','PRH','MUR'].map(k=>{const f=FAC[k];const w=windDirSpd(...Object.values(windAt(f,0)));return`<tr><td>${f.short}</td><td>${String(Math.round(w.dir)).padStart(3,'0')}° ${w.spd.toFixed(0)} kt</td><td class="${f.wx.fog?'c-warn':''}">${f.wx.fog?'¼ SM FG':'10 SM'}</td><td>${f.wx.fog?'OVC002':'SCT045'}</td></tr>`}).join('');
+  setHTML($('wx'),`<table class="t"><tr><th>Field</th><th>Wind</th><th>Vis</th><th>Ceiling</th></tr>${wl}</table>`);
+}
+function renderAlerts(force){
+  const el=$('alerts');const now=performance.now();
+  const html=S.alerts.slice(-2).map(a=>`<div class="alert ${a.sev}" role="alert"><div class="ah"><span class="tag ${a.mod}">${a.mod==='VV'?'V&V':a.mod}</span>${a.title}</div><div class="ab">${a.body}</div><div class="aa">${a.options.map((o,i)=>`<button class="btn ${o.rec?'primary':''}" data-alert="${a.id}" data-opt="${i}">${o.label}${o.rec&&a.decision?' · recommended':''}</button>`).join('')}<span class="count">${a.decision?'auto in ':'closes in '}${Math.max(0,Math.ceil((a.deadline-(now-a.created))/1000))} s</span></div></div>`).join('');
+  setHTML(el,html);
+}
+function renderLog(){S.logDirty=false;setHTML($('log'),S.log.slice(0,120).map(l=>`<div class="${l.sev}"><span class="mono">${fmtClock(l.t,'E')}</span><span><span class="tag ${l.mod}">${l.mod==='VV'?'V&V':l.mod}</span></span><span>${l.msg}</span></div>`).join(''))}
+
+/* ================= interaction ================= */
+function setView(v){S.view=v;$('viewOps').hidden=v!=='ops';$('viewDispatch').hidden=v!=='dispatch';$('tabOps').setAttribute('aria-pressed',v==='ops');$('tabDisp').setAttribute('aria-pressed',v==='dispatch');$('viewOps')._built=v==='ops'&&$('viewOps')._built;renderUI()}
+function setSpeed(s,silent){S.speed=s;document.querySelectorAll('#speedSeg button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.speed===s))}
+function updatePlay(){$('playBtn').textContent=S.paused?'▶ Run':'❚❚ Pause'}
+$('playBtn').onclick=()=>{S.paused=!S.paused;updatePlay()};
+$('speedSeg').onclick=e=>{const b=e.target.closest('button');if(b){setSpeed(+b.dataset.speed);if(S.forcedSlow)S.forcedSlow=null}};
+document.querySelector('.tabs').onclick=e=>{const b=e.target.closest('button');if(b)setView(b.dataset.view)};
+$('aboutBtn').onclick=()=>{$('aboutModal').hidden=false};$('aboutClose').onclick=()=>{$('aboutModal').hidden=true};
+$('logClear').onclick=()=>{S.log=[];S.logDirty=true};
+$('injectBtn').onclick=()=>{const t=$('injTarget');t.innerHTML=S.aircraft.map(a=>`<option value="${a.id}"${a.id===S.selected?' selected':''}>${a.id} · ${(PHASE[a.phase]||[a.phase])[0]}${a.mission?' · → '+FAC[a.divertTo||a.mission.to].short:''}</option>`).join('');$('evgrid').innerHTML=EVENTS.map(e=>`<button class="ev" data-ev="${e.id}"><span><span class="tag ${e.mod}">${e.mod==='VV'?'V&V':e.mod}</span></span><b>${e.name}</b><span>${e.desc}</span></button>`).join('');$('injectModal').hidden=false};
+$('injClose').onclick=()=>{$('injectModal').hidden=true};
+$('evgrid').onclick=e=>{const b=e.target.closest('[data-ev]');if(!b)return;const id=$('injTarget').value;if(inject(b.dataset.ev,id)){S.selected=id;$('injectModal').hidden=true;if(S.paused){S.paused=false;updatePlay()}setView('ops')}else{b.style.borderColor='var(--crit)';b.querySelector('span:last-child').textContent='Pick an aircraft that is airborne for this event.'}};
+$('demoBtn').onclick=startDemo;$('startDemo').onclick=startDemo;
+$('startFree').onclick=()=>{$('intro').hidden=true;S.paused=false;updatePlay()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){['injectModal','aboutModal'].forEach(id=>$(id).hidden=true)}if(e.key===' '&&e.target===document.body){e.preventDefault();S.paused=!S.paused;updatePlay()}});
+$('guide').onclick=e=>{const b=e.target.closest('[data-g]');if(!b)return;if(b.dataset.g==='exit'){S.demo=null;renderGuide()}else if(b.dataset.g==='gen'){S.demo=null;renderGuide();const a=S.aircraft.find(x=>x.id==='HX-202');if(airborne(a)){inject('generator','HX-202');S.selected='HX-202'}else{const b2=S.aircraft.find(x=>airborne(x));if(b2){inject('generator',b2.id);S.selected=b2.id}}}};
+$('alerts').onclick=e=>{const b=e.target.closest('[data-alert]');if(!b)return;const a=S.alerts.find(x=>x.id===+b.dataset.alert);if(!a)return;const o=a.options[+b.dataset.opt];if(a.decision)log('SYS',`Operator decision: ${o.label}.`);resolveAlert(a.id,o.act)};
+$('side').addEventListener('click',e=>{
+  const act=e.target.closest('[data-act]');if(act){const ac=sel();const a=act.dataset.act;if(a==='select-next'){const i=S.aircraft.indexOf(ac);S.selected=S.aircraft[(i+1)%S.aircraft.length].id}else if(a==='dispatch'){setView('dispatch')}else doAction(ac,a);renderUI();return}
+  const pick=e.target.closest('[data-pick]');if(pick){S.selected=pick.dataset.pick;renderUI();return}
+  const l=e.target.closest('[data-launch]');if(l){const o=S.orders.find(x=>x.id===l.dataset.launch);const s=document.querySelector(`[data-osel="${o.id}"]`);const ac=S.aircraft.find(a=>a.id===s.value);if(o&&ac){launch(ac,o);S.selected=ac.id;if(S.paused){S.paused=false;updatePlay()}renderUI()}}
+});
+$('side').addEventListener('change',e=>{if(e.target.id==='acSel'){S.selected=e.target.value;renderUI()}});
+$('nrItem').innerHTML=ITEMS.map(([n,kg],i)=>`<option value="${i}">${n} · ${kg} kg</option>`).join('');
+$('nrDest').innerHTML=Object.values(FAC).filter(f=>f.type==='hospital').map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
+$('newReq').addEventListener('submit',e=>{e.preventDefault();const [item,kg]=ITEMS[+$('nrItem').value];const to=$('nrDest').value,pri=$('nrPri').value;const o={id:'O-'+(S.nextO++),item,kg,from:'LOU',to,pri,caseT:S.t+(pri==='STAT'?10800:21600),status:'pending',created:S.t};S.orders.unshift(o);log('DISPATCH',`Request ${o.id} added: ${item} for ${FAC[to].name}.`);renderUI()});
+// map interactions
+let drag=null;
+cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,cx:view.cx,cy:view.cy,moved:false};cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>4){drag.moved=true;cv.classList.add('dragging');if(S.follow){S.follow=false;$('follow').setAttribute('aria-pressed','false')}}view.cx=drag.cx-dx/view.s;view.cy=drag.cy+dy/view.s});
+cv.addEventListener('pointerup',e=>{cv.classList.remove('dragging');if(drag&&!drag.moved){const r=cv.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;let best=null,bd=18;for(const a of S.aircraft){const d=Math.hypot(sx(a.x)-mx,sy(a.y)-my);if(d<bd){bd=d;best=a}}if(best){S.selected=best.id;renderUI()}}drag=null});
+cv.addEventListener('wheel',e=>{e.preventDefault();const r=cv.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const wx=view.cx+(mx-W/2)/view.s,wy=view.cy-(my-H/2)/view.s;const f=Math.exp(-e.deltaY*0.0015);view.s=clamp(view.s*f,0.8,40);view.cx=wx-(mx-W/2)/view.s;view.cy=wy+(my-H/2)/view.s},{passive:false});
+$('zIn').onclick=()=>view.s=clamp(view.s*1.35,0.8,40);$('zOut').onclick=()=>view.s=clamp(view.s/1.35,0.8,40);$('zFit').onclick=()=>{fitView();S.follow=false;$('follow').setAttribute('aria-pressed','false')};
+$('follow').onclick=()=>{S.follow=!S.follow;$('follow').setAttribute('aria-pressed',S.follow)};
+window.addEventListener('resize',()=>{resize()});
+
+/* ================= boot ================= */
+initWorld();for(let i=0;i<3;i++)stepSim(1);loadCols();resize();renderUI();updatePlay();requestAnimationFrame(tick);
+window.__helix={get S(){return S},inject,doAction,stepSim,startDemo,setView,remaining,renderUI};
+</script>
+
+</body>
+</html>
