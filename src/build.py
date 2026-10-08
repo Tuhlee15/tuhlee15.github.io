@@ -30,7 +30,7 @@ index=head('Tully Njoroge','Tully Njoroge: MBA in Finance and Entrepreneurship, 
           <polyline class="draw" points="20,230 70,214 110,222 150,188 190,196 230,160 270,150 310,118 350,96 384,70" fill="none" stroke="#e0a24e" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
           <g class="bars"><rect x="40" y="200" width="18" height="40" rx="3" fill="#5b8cff"/><rect x="100" y="186" width="18" height="54" rx="3" fill="#5b8cff"/><rect x="160" y="160" width="18" height="80" rx="3" fill="#5b8cff"/><rect x="220" y="150" width="18" height="90" rx="3" fill="#5b8cff"/><rect x="280" y="120" width="18" height="120" rx="3" fill="#5b8cff"/><rect x="340" y="92" width="18" height="148" rx="3" fill="#5b8cff"/></g>
           <circle cx="384" cy="70" r="6" fill="#eef1f6" stroke="#0b0e14" stroke-width="2"/>
-          <text x="20" y="40" font-family="IBM Plex Mono, ui-monospace, monospace" font-size="13" fill="#8d95a6">AEP · BUY · $159.42</text>
+          <text x="20" y="40" font-family="Azeret Mono, ui-monospace, monospace" font-size="13" fill="#8d95a6">AEP · BUY · $159.42</text>
         </svg>
       </div>
       <div class="win-body"><span class="code fin">Finance · Equity research</span><h3 class="display">Crummer Truist Portfolio</h3><p>The utilities call and two BUY cases I made for a student fund that invests real money.</p><span class="more">Explore <span class="arr">→</span></span></div>

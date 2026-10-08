@@ -65,9 +65,9 @@ function field(cv,opts={}){
     craft.forEach((k,i)=>{if(!reduce){k.t+=k.v*0.016;if(k.t>1)k.t-=1;if(k.t<0)k.t+=1}const a=arcs[k.arc];
       for(let j=18;j>=0;j--){const tt=k.t-j*0.006*Math.sign(k.v);if(tt<0||tt>1)continue;const p=q(a,tt);c.fillStyle=`rgba(169,194,255,${0.5*(1-j/18)})`;c.fillRect(p.x-1,p.y-1,2,2)}
       const p=q(a,k.t);c.beginPath();c.arc(p.x,p.y,3.2,0,7);c.fillStyle=i===0?'#ffffff':'#a9c2ff';c.fill();c.beginPath();c.arc(p.x,p.y,9,0,7);c.strokeStyle=i===0?'rgba(255,255,255,0.45)':'rgba(169,194,255,0.25)';c.stroke();
-      if(i===0){k.pos=p;c.font='11px "IBM Plex Mono", monospace';c.fillStyle='rgba(238,241,246,0.85)';c.fillText('HX-201',p.x+13,p.y-8)}});
+      if(i===0){k.pos=p;c.font='11px "Azeret Mono", monospace';c.fillStyle='rgba(238,241,246,0.85)';c.fillText('HX-201',p.x+13,p.y-8)}});
     // nodes
-    c.font='11px "IBM Plex Mono", monospace';
+    c.font='11px "Azeret Mono", monospace';
     for(const n of nodes){if(n.id==='SDF')continue;if(n.hub){c.strokeStyle='#eef1f6';c.lineWidth=1.5;c.strokeRect(n.x-6,n.y-6,12,12);c.fillStyle='#eef1f6';c.fillRect(n.x-2,n.y-2,4,4)}else{c.fillStyle='rgba(238,241,246,0.75)';c.fillRect(n.x-2.5,n.y-2.5,5,5)}c.fillStyle='rgba(238,241,246,0.5)';c.fillText(n.id,n.x+10,n.y+4)}
     c.restore();
     if(read&&craft[0].pos&&(!read._t||now-read._t>250)){read._t=now;const p=craft[0].pos,hubN=nodes[0];
@@ -106,8 +106,8 @@ $$('canvas[data-pool]').forEach(cv=>{const c=cv.getContext('2d');let W,H,D;const
     sw.forEach((s,i)=>{if(!reduce){s.x+=s.v*dt*s.dir;if(s.x>1){s.x=1;s.dir=-1}if(s.x<0){s.x=0;s.dir=1}}const x=m+12+s.x*(W-2*m-24),y=i*lane+lane/2;
       for(let k=1;k<10;k++){c.fillStyle=`rgba(191,230,255,${0.16*(1-k/10)})`;c.beginPath();c.arc(x-s.dir*k*5,y+Math.sin(t/120+k)*1.5,Math.max(1,3-k*0.2),0,7);c.fill()}
       c.beginPath();c.arc(x,y,i===3?5.5:4,0,7);c.fillStyle=i===3?'#ffffff':'rgba(191,230,255,0.75)';c.fill();
-      if(i===3){c.font='11px "IBM Plex Mono", monospace';c.fillStyle='#ffffff';c.fillText('TN',x+(s.dir>0?10:-26),y-8)}});
-    c.font='11px "IBM Plex Mono", monospace';c.fillStyle='rgba(191,230,255,0.45)';for(let i=0;i<8;i++)c.fillText(String(i+1),6,i*lane+lane/2+4);
+      if(i===3){c.font='11px "Azeret Mono", monospace';c.fillStyle='#ffffff';c.fillText('TN',x+(s.dir>0?10:-26),y-8)}});
+    c.font='11px "Azeret Mono", monospace';c.fillStyle='rgba(191,230,255,0.45)';for(let i=0;i<8;i++)c.fillText(String(i+1),6,i*lane+lane/2+4);
     if(!reduce)requestAnimationFrame(f)};
   lay();addEventListener('resize',lay);requestAnimationFrame(f)});
 
@@ -126,13 +126,13 @@ function diverging(host){
     const lab=W<480?118:170,pad=46;const max=Math.max(...data.map(d=>Math.abs(d.v)))*1.05;const x0=lab+pad+(W-lab-pad*2)/2;const sc=(W-lab-pad*2)/2/max;
     const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':host.dataset.label});
     // grid
-    [-1,-.5,0,.5,1].forEach(f=>{const v=Math.round(max*f/5)*5;const x=x0+v*sc;svg.appendChild(el('line',{x1:x,x2:x,y1:top,y2:H-bot,stroke:v===0?'rgba(238,241,246,0.35)':COL.grid,'stroke-width':1}));svg.appendChild(el('text',{x,y:H-8,'text-anchor':'middle','font-size':11,fill:COL.muted,'font-family':'IBM Plex Mono, ui-monospace, monospace'},(v>0?'+':'')+v+unit))});
+    [-1,-.5,0,.5,1].forEach(f=>{const v=Math.round(max*f/5)*5;const x=x0+v*sc;svg.appendChild(el('line',{x1:x,x2:x,y1:top,y2:H-bot,stroke:v===0?'rgba(238,241,246,0.35)':COL.grid,'stroke-width':1}));svg.appendChild(el('text',{x,y:H-8,'text-anchor':'middle','font-size':11,fill:COL.muted,'font-family':'Azeret Mono, ui-monospace, monospace'},(v>0?'+':'')+v+unit))});
     data.forEach((d,i)=>{const y=top+i*row+row/2;const isH=d.k===hl;const col=Math.abs(d.v)<=neutral?COL.neu:(d.v>0?COL.pos:COL.neg);
-      svg.appendChild(el('text',{x:lab,y:y+4,'text-anchor':'end','font-size':13,fill:isH?COL.ink:COL.muted,'font-weight':isH?700:400,'font-family':'Archivo, Arial, sans-serif'},d.k));
+      svg.appendChild(el('text',{x:lab,y:y+4,'text-anchor':'end','font-size':13,fill:isH?COL.ink:COL.muted,'font-weight':isH?700:400,'font-family':'Figtree, Arial, sans-serif'},d.k));
       const w=Math.max(2,Math.abs(d.v)*sc),x=d.v>=0?x0:x0-w,h=14;
       const r=Math.min(4,w/2);const p=d.v>=0?`M${x},${y-h/2}h${w-r}a${r},${r} 0 0 1 ${r},${r}v${h-2*r}a${r},${r} 0 0 1 -${r},${r}h-${w-r}z`:`M${x+w},${y-h/2}h-${w-r}a${r},${r} 0 0 0 -${r},${r}v${h-2*r}a${r},${r} 0 0 0 ${r},${r}h${w-r}z`;
       const bar=el('path',{d:p,fill:col,opacity:isH||!hl?1:0.75});svg.appendChild(bar);
-      svg.appendChild(el('text',{x:d.v>=0?x0+w+6:x0-w-6,y:y+4,'text-anchor':d.v>=0?'start':'end','font-size':12,fill:isH?COL.ink:COL.muted,'font-family':'IBM Plex Mono, ui-monospace, monospace','font-weight':isH?600:400},(d.v>0?'+':'')+d.v+unit));
+      svg.appendChild(el('text',{x:d.v>=0?x0+w+6:x0-w-6,y:y+4,'text-anchor':d.v>=0?'start':'end','font-size':12,fill:isH?COL.ink:COL.muted,'font-family':'Azeret Mono, ui-monospace, monospace','font-weight':isH?600:400},(d.v>0?'+':'')+d.v+unit));
       const hit=el('rect',{x:0,y:y-row/2,width:W,height:row,fill:'transparent'});
       hit.addEventListener('pointermove',e=>{showTip(e,`<b>${d.k}</b><br>${d.tip}`);bar.setAttribute('opacity',1)});hit.addEventListener('pointerleave',()=>{hideTip();bar.setAttribute('opacity',isH||!hl?1:0.75)});svg.appendChild(hit)});
     host.appendChild(svg);
@@ -145,15 +145,15 @@ function football(host){
     host.innerHTML='';const W=Math.max(320,host.clientWidth),row=78,top=10,bot=30,H=top+bot+row*rows.length,lab=W<480?64:96,pr=24;
     const lo=80,hi=180,sc=(W-lab-pr)/(hi-lo),X=v=>lab+(v-lo)*sc;
     const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':host.dataset.label});
-    for(let v=lo;v<=hi;v+=20){svg.appendChild(el('line',{x1:X(v),x2:X(v),y1:top,y2:H-bot,stroke:COL.grid}));svg.appendChild(el('text',{x:X(v),y:H-10,'text-anchor':'middle','font-size':11,fill:COL.muted,'font-family':'IBM Plex Mono, ui-monospace, monospace'},'$'+v))}
+    for(let v=lo;v<=hi;v+=20){svg.appendChild(el('line',{x1:X(v),x2:X(v),y1:top,y2:H-bot,stroke:COL.grid}));svg.appendChild(el('text',{x:X(v),y:H-10,'text-anchor':'middle','font-size':11,fill:COL.muted,'font-family':'Azeret Mono, ui-monospace, monospace'},'$'+v))}
     rows.forEach((d,i)=>{const y=top+i*row+row/2;
-      svg.appendChild(el('text',{x:0,y:y+5,'font-size':15,fill:COL.ink,'font-weight':700,'font-family':'Archivo, Arial, sans-serif'},d.k));
+      svg.appendChild(el('text',{x:0,y:y+5,'font-size':15,fill:COL.ink,'font-weight':700,'font-family':'Figtree, Arial, sans-serif'},d.k));
       const g=el('g');
       g.appendChild(el('rect',{x:X(d.lo),y:y-8,width:X(d.hi)-X(d.lo),height:16,rx:4,fill:COL.pos}));
       g.appendChild(el('line',{x1:X(d.price),x2:X(d.price),y1:y-20,y2:y+20,stroke:COL.neg,'stroke-width':2.5}));
       g.appendChild(el('circle',{cx:X(d.base),cy:y,r:6.5,fill:COL.ink,stroke:COL.surf,'stroke-width':2}));
-      g.appendChild(el('text',{x:X(d.base),y:y-16,'text-anchor':'middle','font-size':12,fill:COL.ink,'font-family':'IBM Plex Mono, ui-monospace, monospace','font-weight':600},'$'+d.base.toFixed(2)));
-      g.appendChild(el('text',{x:X(d.price),y:y+33,'text-anchor':'middle','font-size':11.5,fill:COL.muted,'font-family':'IBM Plex Mono, ui-monospace, monospace'},'$'+d.price.toFixed(2)));
+      g.appendChild(el('text',{x:X(d.base),y:y-16,'text-anchor':'middle','font-size':12,fill:COL.ink,'font-family':'Azeret Mono, ui-monospace, monospace','font-weight':600},'$'+d.base.toFixed(2)));
+      g.appendChild(el('text',{x:X(d.price),y:y+33,'text-anchor':'middle','font-size':11.5,fill:COL.muted,'font-family':'Azeret Mono, ui-monospace, monospace'},'$'+d.price.toFixed(2)));
       svg.appendChild(g);
       const hit=el('rect',{x:0,y:y-row/2,width:W,height:row,fill:'transparent'});
       hit.addEventListener('pointermove',e=>showTip(e,`<b>${d.name}</b><br><span class="k">Base-case value</span> $${d.base.toFixed(2)}<br><span class="k">Sensitivity range</span> $${d.lo}–$${d.hi}<br><span class="k">Price, 3 Mar 2026</span> $${d.price.toFixed(2)}<br><span class="k">Implied upside</span> ${d.up}`));hit.addEventListener('pointerleave',hideTip);svg.appendChild(hit)});
